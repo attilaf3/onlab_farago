@@ -35,9 +35,9 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
     t_hss_min_out = kwargs.get('t_hss_min', 1)  # minimum time of discharge
     c_hss = kwargs.get('c_hss', 0.00116667)  # kWh/kg/°C
     a_hss = kwargs.get('a_hss', 0.01275)  # kW/°C
-    T_env = kwargs.get('T_env', config.getint("physics", "room_temperature"))  # °C
-    T_max = kwargs.get('T_max', config.getint("physics", "hot_water_set_temperature"))  # °C
-    T_in = kwargs.get('T_in', kwargs.get('T_set', config.getint("physics", "cold_water_temperature")))  # °C
+    T_env = kwargs.get('T_env', 20)  # °C
+    T_max = kwargs.get('T_max', 55)  # °C
+    T_in = kwargs.get('T_in', 12)  # °C
     T_min = T_in
     vol_hss_water = kwargs.get('vol_hss_water', 3200)  # l/kg
     eta_elh = kwargs.get('eta_elh', 1)  # electric heater efficiency
