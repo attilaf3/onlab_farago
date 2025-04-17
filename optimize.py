@@ -273,8 +273,8 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
         e_bess_stor[t] = pulp.value(e_bess_stor[t])
         p_hss_in[t] = pulp.value(p_hss_in[t])
         p_hss_out[t] = pulp.value(p_hss_out[t])
-        p_elh_in[t] = pulp.value(p_elh_in[t])
-        p_elh_out[t] = pulp.value(p_elh_out[t])
+        # p_elh_in[t] = pulp.value(p_elh_in[t])
+        # p_elh_out[t] = pulp.value(p_elh_out[t])
         t_hss[t] = pulp.value(t_hss[t])
         p_shared[t] = pulp.value(p_shared[t])
         p_cl_grid[t] = pulp.value(p_cl_grid[t])
@@ -287,6 +287,11 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
         d_bess[t] = pulp.value(d_bess[t])
         d_grid[t] = pulp.value(d_grid[t])
         y_shared[t] = pulp.value(y_shared[t])
+        p_elh_in[t] = pulp.value(p_elh_in[t]) if isinstance(p_elh_in[t], pulp.LpVariable) else 0
+        p_elh_out[t] = pulp.value(p_elh_out[t]) if isinstance(p_elh_out[t], pulp.LpVariable) else 0
+
+    p_elh_in = [0 if v is None else v for v in p_elh_in]
+    p_elh_out = [0 if v is None else v for v in p_elh_out]
     e_hss_stor = vol_hss_water * c_hss * (np.array(t_hss) - T_env) / dt
 
     # Store in results
