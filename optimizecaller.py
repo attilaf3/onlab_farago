@@ -4,50 +4,14 @@ import numpy as np
 from optimize import optimize
 
 # Ctrl+Shift+Alt+L: code cleanup: hosszú sorok tördelése+importok optimalizálása
-# TODO:
-# input.csv-ból kiszedni a negyedórás adatokat:
-# PV termelését
-# Háztartás fogyasztását
-# Kiolvasni, dataframe-ben eltárolod
-# Commit1
-# %%
+
+
 df = pd.read_csv('input.csv', sep=';', index_col=0, parse_dates=True)
 # df_filtered = df[~df.index.astype(str).str.contains(":15|:30|:45", regex=True)]  # df.resample("1h").first()
 df_filtered = df.resample("1h").sum()
 na_values = df_filtered.values  # numpy array
 
 
-# #Optimize meghívása ezekkel az értékekkel
-# #Valamilyen megjelenítése az erdményeknek
-# print(df_filtered)
-
-# %%
-# results, status, objective, num_vars, num_constraints = optimize(na_values[:, 0],na_values[:, 1],na_values[:, 2],size_elh=4, bess_size=20)
-# print(results)
-# print(status)
-# print(objective)
-#
-#
-# time_index = df.resample("1h").sum().index
-#
-# p_pv = na_values[:,0]
-#
-#
-# plt.figure(figsize=(12, 6))
-# plt.plot(time_index.hour[0:24], p_pv[0:24], label="PV Production", linestyle='-', marker='o')
-# plt.plot(time_index.hour[0:24], results["p_ue"][0:24], label="Electricity Used", linestyle='--', marker='x')
-# plt.plot(time_index.hour[0:24], results["p_with"][0:24], label="Withdrawn Power", linestyle='-.', marker='s')
-# plt.plot(time_index.hour[0:24], results["p_inj"][0:24], label="Injected Power", linestyle=':', marker='d')
-# plt.xlabel("Time")
-# plt.ylabel("Power (kW)")
-# plt.title("Optimization Results Over Time")
-# plt.legend()
-# plt.grid(True)
-# plt.xticks(rotation=45)
-# plt.tight_layout()
-# plt.show()
-
-# %%
 def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_stor, p_elh_out,
                     p_ut, p_shared, p_cl_rec, p_cl_grid, p_cl_with, e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl,
                     p_grid_in, p_grid_out, diff_hss_out=None, diff_hss_in=None, params=None):
@@ -73,7 +37,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
 
         # Electric node of the condominium
         ax = axes[0, 0]
-        #ax.set_xlim(t0, tf - 1)
+        # ax.set_xlim(t0, tf - 1)
         # Plot "positive" half
         bottom = np.zeros_like(time, dtype=float)
         ax.bar(time, p_pv[t0:tf], bottom=bottom, label=r'$P_\mathrm{pv}$', **bar_kw)
@@ -117,7 +81,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
 
         # Thermal node
         ax = axes[1, 0]
-        #ax.set_xlim(t0, tf - 1)
+        # ax.set_xlim(t0, tf - 1)
         # # Plot "positive" half
         bottom = np.zeros_like(time, dtype=float)
 
@@ -183,7 +147,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
 
         # CSC
         ax = axes[2, 0]
-        #ax.set_xlim(t0, tf - 1)
+        # ax.set_xlim(t0, tf - 1)
         # Interpolate for graphical purposes
         t_plot = np.linspace(t0, tf, 1000)
         f_plot = lambda x: np.interp(t_plot, time, x)
@@ -218,8 +182,8 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
         plt.subplots_adjust(top=0.55)  # Adjust the position of the overall title
         fig.suptitle(titles[i], fontsize=fontsize)
         fig.tight_layout()
-        #fig.subplots_adjust(left=0.063, bottom=0.095, right=0.905,top=0.88, wspace=0.413, hspace=0.564)
-        #plt.savefig('oneuser_'+titles[i].lower(), dpi=300, bbox_inches='tight')
+        # fig.subplots_adjust(left=0.063, bottom=0.095, right=0.905,top=0.88, wspace=0.413, hspace=0.564)
+        # plt.savefig('oneuser_'+titles[i].lower(), dpi=300, bbox_inches='tight')
         # output_dir = config.get("path", "figures_output")
         # makedirs(output_dir, exist_ok=True)
         # plt.savefig(
@@ -247,8 +211,8 @@ def extract_results_and_show(results):
     d_cl = results.get('d_cl')
     p_grid_in = results.get('p_grid_in')
     p_grid_out = results.get('p_grid_out')
-    #diff_hss_out = results.get('diff_hss_out').sum(axis=0)
-    #diff_hss_in = results.get('diff_hss_in').sum(axis=0)
+    # diff_hss_out = results.get('diff_hss_out').sum(axis=0)
+    # diff_hss_in = results.get('diff_hss_in').sum(axis=0)
     p_pv = na_values[:, 1]
     p_ue = na_values[:, 0]
     p_ut = na_values[:, 2]
@@ -256,6 +220,8 @@ def extract_results_and_show(results):
                     p_cl_grid, p_cl_with, e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl, p_grid_in, p_grid_out, p_elh_in)
 
 
-results, status, objective, num_vars, num_constraints = optimize(na_values[:, 1], na_values[:, 0], na_values[:, 2], size_elh=4, size_bess=20, size_hss=130)
-#results, status, objective, num_vars, num_constraints = optimize(na_values[:, 0], na_values[:, 1], na_values[:, 2], size_elh=4, size_bess=20)
+results, status, objective, num_vars, num_constraints = optimize(na_values[:, 1], na_values[:, 0], na_values[:, 2],
+                                                                 size_elh=4, size_bess=20, size_hss=130, run_lp=False,
+                                                                 objective="environmental")
+# results, status, objective, num_vars, num_constraints = optimize(na_values[:, 0], na_values[:, 1], na_values[:, 2], size_elh=4, size_bess=20)
 extract_results_and_show(results)

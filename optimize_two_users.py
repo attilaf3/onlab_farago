@@ -155,7 +155,8 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
         prob += pulp.lpSum([p_grid_out[t] + p_grid_in[t] for t in time_set])
 
     # Write LP for debugging
-    prob.writeLP("debug_model.lp")
+    if run_lp:
+        prob.writeLP("debug_two_user.lp")
 
     # Solve
     t = time.time()
@@ -216,4 +217,3 @@ na_p_ut = df_filtered[["thermal_user1", "thermal_user2"]].to_numpy()
 # Run optimization
 results = optimize_two_users(p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed, size_elh=np.array([2, 2.5]), size_bess=20)
 print(results)
-

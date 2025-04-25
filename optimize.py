@@ -254,6 +254,10 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
     else:
         prob += pulp.lpSum([p_grid_out[t] + p_grid_in[t] for t in time_set])
 
+    # Save LP model if debugging is requested
+    if run_lp:
+        prob.writeLP("debug_one_user.lp")
+
     # Solve the problem
     t = time.time()
     status = prob.solve(pulp.GUROBI_CMD(msg=True, gapRel=gapRel, timeLimit=timeLimit))
@@ -273,8 +277,8 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
         e_bess_stor[t] = pulp.value(e_bess_stor[t])
         p_hss_in[t] = pulp.value(p_hss_in[t])
         p_hss_out[t] = pulp.value(p_hss_out[t])
-        # p_elh_in[t] = pulp.value(p_elh_in[t])
-        # p_elh_out[t] = pulp.value(p_elh_out[t])
+        p_elh_in[t] = pulp.value(p_elh_in[t])
+        p_elh_out[t] = pulp.value(p_elh_out[t])
         t_hss[t] = pulp.value(t_hss[t])
         p_shared[t] = pulp.value(p_shared[t])
         p_cl_grid[t] = pulp.value(p_cl_grid[t])
