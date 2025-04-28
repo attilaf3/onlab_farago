@@ -4,14 +4,23 @@ import numpy as np
 import pulp
 from pulp import LpStatusOptimal, LpStatus
 
-def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_hss=None, vol_hss_water=None, run_lp=False, **kwargs):
 
+def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_hss=None, vol_hss_water=None,
+                       run_lp=False, **kwargs):
 
-    assert (n_timestep := p_pv.shape[0] == p_consumed.shape[0] == p_ut.shape[0])
-    "Input arrays must have the same length."
+    # Bemenetek ellenőrzése
+    print("Input shapes inside function:")
+    print("p_pv shape:", p_pv.shape)
+    print("p_consumed shape:", p_consumed.shape)
+    print("p_ut shape:", p_ut.shape)
+    n_timestep = p_pv.shape[0]
 
+    # n_timestep definiálása
+    n_timestep = p_pv.shape[0]
+    assert n_timestep == p_consumed.shape[0] == p_ut.shape[0], "Input arrays must have the same length."
+    print("n_timestep:", n_timestep)
     time_set = range(n_timestep)
-    n_timesteps_in_a_day = 24  # fixálva 24 órára
+    print("time_set length:", len(time_set))
 
     # Parameters
     eta_bess_in = kwargs.get('eta_bess_in', 0.98)
@@ -46,38 +55,38 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
 
     M_cl = 1.3 * (p_ut[:, 0] + p_ut[:, 1]).max()
     M_grid_in = 1.1 * (p_pv[:, 0] + p_pv[:, 1]).max() + size_bess / t_bess_min
-    M_grid_out = 1.1 * (p_consumed[:, 0] + p_consumed[:, 1]).max() + size_bess / t_bess_min + (p_ut[:, 0] + p_ut[:, 1]).max() * 1.1
+    M_grid_out = 1.1 * (p_consumed[:, 0] + p_consumed[:, 1]).max() + size_bess / t_bess_min + (
+                p_ut[:, 0] + p_ut[:, 1]).max() * 1.1
     M_cl_rec = (p_pv[:, 0] + p_pv[:, 1]).max() + size_bess / t_bess_min
     M_shared = 1.1 * max(M_grid_in, M_grid_out)
 
     prob = pulp.LpProblem("CSCopt", pulp.LpMinimize)
 
     # Define decision variables here
-    p_cl_with = np.array([[pulp.LpVariable(f'Pcl_with_{u}_{t}', lowBound=0) for t in time_set] for u in user_ids])
-    p_cl_grid = np.array([[pulp.LpVariable(f'Pcl_grid_{u}_{t}', lowBound=0) for t in time_set] for u in user_ids])
-    p_cl_rec = np.array([[pulp.LpVariable(f'Pcl_rec_{u}_{t}', lowBound=0) for t in time_set] for u in user_ids])
+    p_cl_with = np.array([[pulp.LpVariable(f'Pcl_with_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
+    p_cl_grid = np.array([[pulp.LpVariable(f'Pcl_grid_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
+    p_cl_rec = np.array([[pulp.LpVariable(f'Pcl_rec_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
     d_cl = [pulp.LpVariable(f'Dcl_{t}', cat=pulp.LpBinary) if not run_lp else 0 for t in time_set]
 
-    p_elh_in = np.array([[pulp.LpVariable(f'Pelh_in_{u}_{t}', lowBound=0) for t in time_set] for u in user_ids])
-    p_elh_out = np.array([[pulp.LpVariable(f'Pelh_out_{u}_{t}', lowBound=0) for t in time_set] for u in user_ids])
+    p_elh_in = np.array([[pulp.LpVariable(f'Pelh_in_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
+    p_elh_out = np.array([[pulp.LpVariable(f'Pelh_out_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
 
-    p_hss_in = np.array([[pulp.LpVariable(f'Phss_in_{u}_{t}', lowBound=0) if hss_flag else 0 for t in time_set]
-                         for u in user_ids])
-    p_hss_out = np.array([[pulp.LpVariable(f'Phss_out_{u}_{t}', lowBound=0) if hss_flag else 0 for t in
-                           time_set] for u in user_ids])
-    e_hss_stor = np.zeros(shape=(len(user_ids), len(time_set)), dtype=float)
-    t_hss = np.array([[pulp.LpVariable(f'Thss_{u}_{t}', lowBound=T_in, upBound=T_max) if hss_flag else 0 for t
-                       in time_set] for u in user_ids])
+    p_hss_in = np.array([[pulp.LpVariable(f'Phss_in_{t}_{u}', lowBound=0) if hss_flag else 0 for u in user_ids] for t in time_set])
+    p_hss_out = np.array([[pulp.LpVariable(f'Phss_out_{t}_{u}', lowBound=0) if hss_flag else 0 for u in user_ids] for t in time_set])
+    # e_hss_stor = np.zeros(shape=(len(user_ids), len(time_set)), dtype=float)
+    e_hss_stor = np.array(
+        [[pulp.LpVariable(f'Ehss_stor_{t}_{u}', lowBound=0) if hss_flag else 0 for u in user_ids] for t in time_set])
+    t_hss = np.array([[pulp.LpVariable(f'Thss_{t}_{u}', lowBound=T_in, upBound=T_max) if hss_flag else 0 for u in user_ids] for t in time_set])
 
     p_bess_in = [pulp.LpVariable(f'Pbess_in_{t}', lowBound=0) for t in time_set]
     p_bess_out = [pulp.LpVariable(f'Pbess_out_{t}', lowBound=0) for t in time_set]
     e_bess_stor = [pulp.LpVariable(f'Ebess_stor_{t}', lowBound=0) for t in time_set]
     d_bess = [pulp.LpVariable(f'Dbess_{t}', cat=pulp.LpBinary) if not run_lp else 0 for t in time_set]
 
-    p_inj_user = np.array([[pulp.LpVariable(f'Pinj_{u}_{t}', lowBound=0) for t in time_set] for u in user_ids])
-    p_with_user = np.array([[pulp.LpVariable(f'Pwith_{u}_{t}', lowBound=0) for t in time_set] for u in user_ids])
-    p_selfcons = np.array([[pulp.LpVariable(f'Pselfcons_{u}_{t}') for t in time_set] for u in user_ids])
-    d_user = np.array([[pulp.LpVariable(f'Dwith_{u}_{t}', cat=pulp.LpBinary) for t in time_set] for u in user_ids])
+    p_inj_user = np.array([[pulp.LpVariable(f'Pinj_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
+    p_with_user = np.array([[pulp.LpVariable(f'Pwith_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
+    p_selfcons = np.array([[pulp.LpVariable(f'Pselfcons_{t}_{u}') for u in user_ids] for t in time_set])
+    d_user = np.array([[pulp.LpVariable(f'Dwith_{t}_{u}', cat=pulp.LpBinary) for u in user_ids] for t in time_set])
     d_grid = [pulp.LpVariable(f'Dgrid_{t}', cat=pulp.LpBinary) for t in time_set]
 
     p_grid_in = [pulp.LpVariable(f'Pgrid_in_{t}', lowBound=0) for t in time_set]
@@ -92,7 +101,7 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
 
         # BESS
         prob += e_bess_stor[k] - e_bess_stor[t] * eta_bess_stor == (
-            p_bess_in[t] * eta_bess_in - p_bess_out[t] * (1 / eta_bess_out)) * dt
+                p_bess_in[t] * eta_bess_in - p_bess_out[t] * (1 / eta_bess_out)) * dt
         prob += p_bess_in[t] <= d_bess[t] * (size_bess / t_bess_min)
         prob += p_bess_out[t] <= (1 - d_bess[t]) * (size_bess / t_bess_min)
         prob += e_bess_stor[t] <= size_bess * soc_bess_max
@@ -100,36 +109,36 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
 
         for u in user_ids:
             # Node balance
-            prob += p_inj_user[u, t] + p_cl_with[u, t] + p_consumed[u, t] == p_pv[u, t] + p_with_user[u, t]
-            prob += p_with_user[u, t] <= d_user[u, t] * (p_consumed[u, t] + M_cl)
-            prob += p_inj_user[u, t] <= (1 - d_user[u, t]) * p_pv[u, t]
+            prob += p_inj_user[t, u] + p_cl_with[t, u] + p_consumed[t, u] == p_pv[t, u] + p_with_user[t, u]
+            prob += p_with_user[t, u] <= d_user[t, u] * (p_consumed[t, u] + M_cl)
+            prob += p_inj_user[t, u] <= (1 - d_user[t, u]) * p_pv[t, u]
 
             # Controlled load
-            prob += p_cl_with[u, t] == p_cl_grid[u, t] + p_cl_rec[u, t]
+            prob += p_cl_with[t, u] == p_cl_grid[t, u] + p_cl_rec[t, u]
 
             if hss_flag:
-                prob += vol_hss_water[u] * c_hss * (t_hss[u, k] - t_hss[u, t]) == (p_hss_in[u, t] -
-                                                                                   p_hss_out[u, t] - a_hss * dt * (
-                                                                                               t_hss[u, t] - T_env))
-                prob += p_elh_out[u, t] == p_elh_in[u][t] * eta_elh[u]
-                prob += p_elh_in[u, t] <= size_elh[u]
-                prob += p_elh_in[u, t] == p_cl_with[u, t]
-                prob += p_hss_in[u, t] == p_elh_out[u, t]
-                prob += p_hss_out[u, t] == p_ut[u, t]
-                prob += p_hss_out[u, k] <= vol_hss_water[u] * c_hss * (t_hss[u, t] - T_in)
+                prob += vol_hss_water[u] * c_hss * (t_hss[k, u] - t_hss[t, u]) == (p_hss_in[t, u] -
+                                                                                   p_hss_out[t, u] - a_hss * dt * (
+                                                                                           t_hss[t, u] - T_env))
+                prob += p_elh_out[t, u] == p_elh_in[t, u] * eta_elh[u]
+                prob += p_elh_in[t, u] <= size_elh[u]
+                prob += p_elh_in[t, u] == p_cl_with[t, u]
+                prob += p_hss_in[t, u] == p_elh_out[t, u]
+                prob += p_hss_out[t, u] == p_ut[t, u]
+                prob += p_hss_out[k, u] <= vol_hss_water[u] * c_hss * (t_hss[t, u] - T_in)
 
         # cl energy balance
-        prob += pulp.lpSum(p_cl_rec[u, t] for u in user_ids) <= pulp.lpSum(p_pv[u, t] for u in user_ids) + p_bess_out[t]
-        prob += pulp.lpSum(p_cl_grid[u, t] for u in user_ids) <= p_grid_out[t]
+        prob += pulp.lpSum(p_cl_rec[t, u] for u in user_ids) <= pulp.lpSum(p_pv[t, u] for u in user_ids) + p_bess_out[t]
+        prob += pulp.lpSum(p_cl_grid[t, u] for u in user_ids) <= p_grid_out[t]
 
         # maximum power of controlled loads
-        prob += pulp.lpSum(p_cl_rec[u, t] for u in user_ids) <= M_cl_rec
-        prob += pulp.lpSum(p_cl_grid[u, t] for u in user_ids) <= M_grid_out
-        prob += pulp.lpSum(p_cl_with[u, t] for u in user_ids)  <= (M_cl_rec + M_grid_out)
+        prob += pulp.lpSum(p_cl_rec[t, u] for u in user_ids) <= M_cl_rec
+        prob += pulp.lpSum(p_cl_grid[t, u] for u in user_ids) <= M_grid_out
+        prob += pulp.lpSum(p_cl_with[t, u] for u in user_ids) <= (M_cl_rec + M_grid_out)
 
         # Shared energy logic
-        prob += p_inj[t] == pulp.lpSum(p_inj_user[u, t] for u in user_ids) + p_bess_out[t]
-        prob += p_with[t] == pulp.lpSum(p_with_user[u, t] for u in user_ids) + p_bess_in[t]
+        prob += p_inj[t] == pulp.lpSum(p_inj_user[t, u] for u in user_ids) + p_bess_out[t]
+        prob += p_with[t] == pulp.lpSum(p_with_user[t, u] for u in user_ids) + p_bess_in[t]
         prob += p_grid_in[t] + p_with[t] == p_grid_out[t] + p_inj[t]
         prob += p_grid_in[t] <= d_grid[t] * M_grid_in
         prob += p_grid_out[t] <= (1 - d_grid[t]) * M_grid_out
@@ -141,7 +150,7 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
 
     if t != time_set[0] and t != time_set[-1]:
         prob += d_cl[t + 1] >= d_cl[t] - d_cl[t - 1]
-
+    n_timesteps_in_a_day = 24
     # d_cl időzítési megszorítás
     y_middle_day = [0] * 10 + [1] * 6 + [0] * 8
     for j in range(0, n_timestep - n_timesteps_in_a_day + 1, n_timesteps_in_a_day):
@@ -180,19 +189,19 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
         p_with[t] = pulp.value(p_with[t])
 
         for u in user_ids:
-            p_inj_user[u, t] = pulp.value(p_inj_user[u, t])
-            p_with_user[u, t] = pulp.value(p_with_user[u, t])
+            p_inj_user[t, u] = pulp.value(p_inj_user[t, u])
+            p_with_user[t, u] = pulp.value(p_with_user[t, u])
             if hss_flag:
-                p_hss_in[u, t] = pulp.value(p_hss_in[u, t])
-                p_hss_out[u, t] = pulp.value(p_hss_out[u, t])
-                e_hss_stor[u, t] = vol_hss_water[u] * c_hss * (pulp.value(t_hss[u, t]) - T_in) / dt
-                t_hss[u, t] = pulp.value(t_hss[u, t])
-            p_elh_in[u, t] = pulp.value(p_elh_in[u, t])
-            p_elh_out[u, t] = pulp.value(p_elh_out[u, t])
-            p_cl_grid[u, t] = pulp.value(p_cl_grid[u, t])
-            p_cl_rec[u, t] = pulp.value(p_cl_rec[u, t])
-            p_cl_with[u, t] = pulp.value(p_cl_with[u, t])
-            p_selfcons[u, t] = p_pv[u, t] - pulp.value(p_inj_user[u, t])
+                p_hss_in[t, u] = pulp.value(p_hss_in[t, u])
+                p_hss_out[t, u] = pulp.value(p_hss_out[t, u])
+                e_hss_stor[t, u] = vol_hss_water[u] * c_hss * (pulp.value(t_hss[t, u]) - T_in) / dt
+                t_hss[t, u] = pulp.value(t_hss[t, u])
+            p_elh_in[t, u] = pulp.value(p_elh_in[t, u])
+            p_elh_out[t, u] = pulp.value(p_elh_out[t, u])
+            p_cl_grid[t, u] = pulp.value(p_cl_grid[t, u])
+            p_cl_rec[t, u] = pulp.value(p_cl_rec[t, u])
+            p_cl_with[t, u] = pulp.value(p_cl_with[t, u])
+            p_selfcons[t, u] = p_pv[t, u] - pulp.value(p_inj_user[t, u])
 
     # Store in results
     results = dict(p_inj_user=np.array(p_inj_user), p_with_user=np.array(p_with_user),
@@ -207,6 +216,7 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
 
     return results, status, objective, user_ids, prob.numVariables(), prob.numConstraints()
 
+
 # Load input
 df = pd.read_csv('input_tobb_haztartas.csv', sep=';', index_col=0, parse_dates=True)
 df_filtered = df.resample("1h").sum()
@@ -214,6 +224,23 @@ na_p_consumed = df_filtered[["consumer1", "consumer2"]].to_numpy()
 na_p_pv = df_filtered[["pv1", "pv2"]].to_numpy()
 na_p_ut = df_filtered[["thermal_user1", "thermal_user2"]].to_numpy()
 
+# Bemenetek ellenőrzése
+print("na_p_consumed shape:", na_p_consumed.shape)
+print("na_p_pv shape:", na_p_pv.shape)
+print("na_p_ut shape:", na_p_ut.shape)
+
 # Run optimization
-results = optimize_two_users(p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed, size_elh=np.array([2, 2.5]), size_bess=20)
-print(results)
+results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(p_pv=na_p_pv, p_ut=na_p_ut,
+                                                                                     p_consumed=na_p_consumed,
+                                                                                   size_elh=np.array([2, 2.5]),
+                                                                                     size_bess=20)
+# Kimeneti méretek
+print("Final results shapes:")
+print("p_inj_user shape:", results['p_inj_user'].shape)
+print("p_with_user shape:", results['p_with_user'].shape)
+print("p_cl_with shape:", results['p_cl_with'].shape)
+print("p_grid_in shape:", results['p_grid_in'].shape)
+print("p_bess_in shape:", results['p_bess_in'].shape)
+print("Objective value:", objective)
+print("Number of variables:", num_vars)
+print("Number of constraints:", num_constraints)
