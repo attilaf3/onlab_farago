@@ -8,19 +8,19 @@ from pulp import LpStatusOptimal, LpStatus
 def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_hss=None, vol_hss_water=None,
                        run_lp=False, **kwargs):
 
-    # Bemenetek ellenőrzése
-    print("Input shapes inside function:")
-    print("p_pv shape:", p_pv.shape)
-    print("p_consumed shape:", p_consumed.shape)
-    print("p_ut shape:", p_ut.shape)
+    # # Bemenetek ellenőrzése
+    # print("Input shapes inside function:")
+    # print("p_pv shape:", p_pv.shape)
+    # print("p_consumed shape:", p_consumed.shape)
+    # print("p_ut shape:", p_ut.shape)
     n_timestep = p_pv.shape[0]
 
     # n_timestep definiálása
     n_timestep = p_pv.shape[0]
     assert n_timestep == p_consumed.shape[0] == p_ut.shape[0], "Input arrays must have the same length."
-    print("n_timestep:", n_timestep)
+    # print("n_timestep:", n_timestep)
     time_set = range(n_timestep)
-    print("time_set length:", len(time_set))
+    # print("time_set length:", len(time_set))
 
     # Parameters
     eta_bess_in = kwargs.get('eta_bess_in', 0.98)
@@ -127,6 +127,11 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
                 prob += p_hss_out[t, u] == p_ut[t, u]
                 prob += p_hss_out[k, u] <= vol_hss_water[u] * c_hss * (t_hss[t, u] - T_in)
 
+        # # DEBUG: Kényszerített megosztott energia teszthez egy időpillanatban
+        # t_test = 100  # tetszőleges időpillanat
+        # prob += p_inj[t_test] >= 1
+        # prob += p_with[t_test] >= 1
+
         # cl energy balance
         prob += pulp.lpSum(p_cl_rec[t, u] for u in user_ids) <= pulp.lpSum(p_pv[t, u] for u in user_ids) + p_bess_out[t]
         prob += pulp.lpSum(p_cl_grid[t, u] for u in user_ids) <= p_grid_out[t]
@@ -224,23 +229,40 @@ na_p_consumed = df_filtered[["consumer1", "consumer2"]].to_numpy()
 na_p_pv = df_filtered[["pv1", "pv2"]].to_numpy()
 na_p_ut = df_filtered[["thermal_user1", "thermal_user2"]].to_numpy()
 
-# Bemenetek ellenőrzése
-print("na_p_consumed shape:", na_p_consumed.shape)
-print("na_p_pv shape:", na_p_pv.shape)
-print("na_p_ut shape:", na_p_ut.shape)
+# # Bemenetek ellenőrzése
+# print("na_p_consumed shape:", na_p_consumed.shape)
+# print("na_p_pv shape:", na_p_pv.shape)
+# print("na_p_ut shape:", na_p_ut.shape)
 
 # Run optimization
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(p_pv=na_p_pv, p_ut=na_p_ut,
                                                                                      p_consumed=na_p_consumed,
                                                                                    size_elh=np.array([2, 2.5]),
                                                                                      size_bess=20)
-# Kimeneti méretek
-print("Final results shapes:")
-print("p_inj_user shape:", results['p_inj_user'].shape)
-print("p_with_user shape:", results['p_with_user'].shape)
-print("p_cl_with shape:", results['p_cl_with'].shape)
-print("p_grid_in shape:", results['p_grid_in'].shape)
-print("p_bess_in shape:", results['p_bess_in'].shape)
-print("Objective value:", objective)
-print("Number of variables:", num_vars)
-print("Number of constraints:", num_constraints)
+# # Kimeneti méretek
+# print("Final results shapes:")
+# print("p_inj_user shape:", results['p_inj_user'].shape)
+# print("p_with_user shape:", results['p_with_user'].shape)
+# print("p_cl_with shape:", results['p_cl_with'].shape)
+# print("p_grid_in shape:", results['p_grid_in'].shape)
+# print("p_bess_in shape:", results['p_bess_in'].shape)
+# print("Objective value:", objective)
+# print("Number of variables:", num_vars)
+# print("Number of constraints:", num_constraints)
+is_shared_used = int(np.any(results["p_shared"] > 0))
+print("Megosztott energia használt:", is_shared_used)
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+p_shared = results["p_shared"]
+
+plt.figure(figsize=(10, 4))
+plt.plot(p_shared, label="Megosztott energia (p_shared)", linewidth=1.5)
+plt.title("Megosztott energia időbeli alakulása")
+plt.xlabel("Időlépés")
+plt.ylabel("Teljesítmény [kW]")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()

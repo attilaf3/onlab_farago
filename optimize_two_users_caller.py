@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt, patheffects as pe
-from optimize_two_users import optimize_two_users
+from optimize_two_users import optimize_two_users, p_shared
 
 # Adatok betöltése
 df = pd.read_csv('input_tobb_haztartas.csv', sep=';', index_col=0, parse_dates=True)
@@ -10,11 +10,13 @@ na_p_consumed = df_filtered[["consumer1", "consumer2"]].to_numpy()  # P_ue
 na_p_pv = df_filtered[["pv1", "pv2"]].to_numpy()  # P_pv
 na_p_ut = df_filtered[["thermal_user1", "thermal_user2"]].to_numpy()  # P_ut
 
+
 def ensure_numeric(arr, default_value=0.0, var_name="variable"):
     """Biztosítja, hogy a tömb numerikus legyen, None vagy nem numerikus értékeket default_value-ra cserélve."""
     if arr is None:
         print(f"Warning: {var_name} is None, replacing with zeros")
-        return np.zeros((8760, 2) if 'user' in var_name or 'cl_' in var_name or 'elh_' in var_name or 'hss_' in var_name else 8760)
+        return np.zeros(
+            (8760, 2) if 'user' in var_name or 'cl_' in var_name or 'elh_' in var_name or 'hss_' in var_name else 8760)
     arr = np.array(arr, dtype=object)  # Objektum típusként kezeljük először
     # Cseréljük None vagy nem numerikus értékeket default_value-ra
     arr = np.where(arr == None, default_value, arr)  # None értékek cseréje
@@ -24,6 +26,7 @@ def ensure_numeric(arr, default_value=0.0, var_name="variable"):
         print(f"Warning: {var_name} contains non-numeric values, replacing with {default_value}. Error: {e}")
         arr = np.full_like(arr, default_value, dtype=np.float64)
     return arr
+
 
 def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
     global time, t_plot
@@ -113,7 +116,8 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
 
         # Vezérlőjel
         axtd = ax.twinx()
-        axtd.plot(time, results['d_cl'][t0:tf], '.', ls='-', color='lightgrey', label=r"$\mathrm{control\ signal\ (on/off)}$")
+        axtd.plot(time, results['d_cl'][t0:tf], '.', ls='-', color='lightgrey',
+                  label=r"$\mathrm{control\ signal\ (on/off)}$")
         axtd.spines["top"].set_visible(False)
         axtd.spines["right"].set_visible(False)
         axtd.spines["left"].set_visible(False)
@@ -129,28 +133,25 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
 
         # CSC (User 1)
         ax = axes[2, 0]
-        t_plot = np.linspace(t0, tf, 1000)
-        f_plot = lambda x: np.interp(t_plot, time, x)
-        p_inj_plot = f_plot(results['p_inj_user'][t0:tf, 0])
-        p_with_plot = f_plot(results['p_with_user'][t0:tf, 0])
-        p_shared = np.minimum(results['p_inj_user'][t0:tf, 0], results['p_with_user'][t0:tf, 0])
-        p_shared_plot = f_plot(p_shared)
+        time = np.arange(t0, tf)
+        p_inj = results['p_inj'][t0:tf]
+        p_with = results['p_with'][t0:tf]
+        p_shared = results['p_shared'][t0:tf]
 
-        ax.plot(time, results['p_inj_user'][t0:tf, 0], label=r'$P_\mathrm{inj}$', color='tab:red', **plot_kw)
-        ax.plot(time, results['p_with_user'][t0:tf, 0], label=r'$P_\mathrm{with}$', color='tab:blue', **plot_kw)
-        ax.plot(time, p_shared, label=r'$P_\mathrm{shared}$', color='tab:green', ls='', marker='s', **plot_kw)
-        ax.fill_between(t_plot, p_shared_plot, p_with_plot, where=p_with_plot > p_shared_plot,
-                        label=r'E$_\mathrm{\leftarrow grid}$', color='tab:blue', **area_kw)
-        ax.fill_between(t_plot, p_shared_plot, p_inj_plot, where=p_inj_plot > p_shared_plot,
-                        label=r'E$_\mathrm{\rightarrow grid}$', color='tab:red', **area_kw)
-        ax.fill_between(t_plot, 0, p_shared_plot, where=p_shared_plot > 0, label=r'E$_\mathrm{shared}$',
-                        color='tab:green')
+        ax.plot(time, p_inj, label=r'$P_\mathrm{inj}$', color='tab:red')
+        ax.plot(time, p_with, label=r'$P_\mathrm{with}$', color='tab:blue')
+        ax.plot(time, p_shared, label=r'$P_\mathrm{shared}$', color='tab:green')
 
-        ax.set_xlabel("Time (h)", fontsize=fontsize)
-        ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("CSC (User 1)", fontsize=fontsize)
-        ax.tick_params(labelsize=fontsize)
-        ax.grid()
+        ax.fill_between(time, p_shared, p_with, where=p_with > p_shared, label='E_from_grid', color='tab:blue',
+                        alpha=0.3)
+        ax.fill_between(time, p_shared, p_inj, where=p_inj > p_shared, label='E_to_grid', color='tab:red', alpha=0.3)
+        ax.fill_between(time, 0, p_shared, where=p_shared > 0, label='E_shared', color='tab:green', alpha=0.6)
+
+        ax.set_title("Community CSC – teljes rendszer energiacseréi")
+        ax.set_xlabel("Időlépés")
+        ax.set_ylabel("Teljesítmény [kW]")
+        ax.legend()
+        ax.grid(True)
 
         # 2. felhasználó (1. oszlop)
         # Elektromos csomópont
@@ -219,7 +220,8 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
 
         # Vezérlőjel
         axtd = ax.twinx()
-        axtd.plot(time, results['d_cl'][t0:tf], '.', ls='-', color='lightgrey', label=r"$\mathrm{control\ signal\ (on/off)}$")
+        axtd.plot(time, results['d_cl'][t0:tf], '.', ls='-', color='lightgrey',
+                  label=r"$\mathrm{control\ signal\ (on/off)}$")
         axtd.spines["top"].set_visible(False)
         axtd.spines["right"].set_visible(False)
         axtd.spines["left"].set_visible(False)
@@ -233,28 +235,15 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
         ax.tick_params(labelsize=fontsize)
         ax.grid()
 
-        # CSC (User 2)
         ax = axes[2, 1]
-        p_inj_plot = f_plot(results['p_inj_user'][t0:tf, 1])
-        p_with_plot = f_plot(results['p_with_user'][t0:tf, 1])
-        p_shared = np.minimum(results['p_inj_user'][t0:tf, 1], results['p_with_user'][t0:tf, 1])
-        p_shared_plot = f_plot(p_shared)
-
-        ax.plot(time, results['p_inj_user'][t0:tf, 1], label=r'$P_\mathrm{inj}$', color='tab:red', **plot_kw)
-        ax.plot(time, results['p_with_user'][t0:tf, 1], label=r'$P_\mathrm{with}$', color='tab:blue', **plot_kw)
-        ax.plot(time, p_shared, label=r'$P_\mathrm{shared}$', color='tab:green', ls='', marker='s', **plot_kw)
-        ax.fill_between(t_plot, p_shared_plot, p_with_plot, where=p_with_plot > p_shared_plot,
-                        label=r'E$_\mathrm{\leftarrow grid}$', color='tab:blue', **area_kw)
-        ax.fill_between(t_plot, p_shared_plot, p_inj_plot, where=p_inj_plot > p_shared_plot,
-                        label=r'E$_\mathrm{\rightarrow grid}$', color='tab:red', **area_kw)
-        ax.fill_between(t_plot, 0, p_shared_plot, where=p_shared_plot > 0, label=r'E$_\mathrm{shared}$',
-                        color='tab:green')
-
-        ax.set_xlabel("Time (h)", fontsize=fontsize)
-        ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("CSC (User 2)", fontsize=fontsize)
-        ax.tick_params(labelsize=fontsize)
-        ax.grid()
+        eff = np.divide(results['p_shared'][t0:tf], results['p_inj'][t0:tf],
+                        out=np.zeros_like(results['p_shared'][t0:tf]), where=results['p_inj'][t0:tf] > 0)
+        ax.plot(time, eff, color='purple', lw=2)
+        ax.set_title("Megosztás hatékonysága ($P_{shared}/P_{inj}$)")
+        ax.set_ylim(0, 1.05)
+        ax.set_ylabel("Arány")
+        ax.set_xlabel("Időlépés")
+        ax.grid(True)
 
         # Jelmagyarázatok (3. oszlop)
         handles, labels = axes[0, 0].get_legend_handles_labels()
@@ -281,6 +270,7 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
         fig.tight_layout()
         plt.show()
 
+
 def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
     # Eredmények kinyerése és numerikus típus biztosítása
     p_inj_user = ensure_numeric(results.get('p_inj_user'), var_name="p_inj_user")
@@ -295,6 +285,8 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
     p_cl_grid = ensure_numeric(results.get('p_cl_grid'), var_name="p_cl_grid")
     p_cl_rec = ensure_numeric(results.get('p_cl_rec'), var_name="p_cl_rec")
     d_cl = ensure_numeric(results.get('d_cl'), var_name="d_cl")
+    p_inj = ensure_numeric(results.get('p_inj'), var_name="p_inj")
+    p_with = ensure_numeric(results.get('p_with'), var_name="p_with")
     # Hőszivattyús változók (csak ha hss_flag=True)
     p_hss_in = results.get('p_hss_in')
     p_hss_out = results.get('p_hss_out')
@@ -326,15 +318,20 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
         'p_hss_in': p_hss_in,
         'p_hss_out': p_hss_out,
         'e_hss_stor': e_hss_stor,
-        't_hss': t_hss
+        't_hss': t_hss,
+        'p_shared': p_shared,
+        'p_inj': p_inj,
+        'p_with': p_with
     }
 
     display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag)
 
+
 # Optimalizálás futtatása
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(
     p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed,
-    size_elh=np.array([2, 2.5]), size_bess=20, run_lp=False, objective="environmental"
+    size_elh=np.array([2, 2.5]), size_bess=20, size_hss=np.array([100, 120]), run_lp=False, objective="environmental",
+    gapRel=0.001
 )
 
 # Eredmények megjelenítése
