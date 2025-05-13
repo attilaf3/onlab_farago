@@ -13,7 +13,6 @@ def optimize(p_pv, p_consumed, p_ut,
              run_lp=False,
              T_set=21.0, T_init=21.0,
              **kwargs):
-
     """
     Extended CSC optimization including:
     - PV, ELH, BESS, HSS, grid
@@ -53,7 +52,6 @@ def optimize(p_pv, p_consumed, p_ut,
     c_sh = kwargs.get('c_sh', 0.0024)
     objective = kwargs.get('objective', 'economic')
 
-
     # --- Házparaméterek ---
     dt = 1  # [h]
     C_zone = 4.16  # [kWh/K]
@@ -85,7 +83,7 @@ def optimize(p_pv, p_consumed, p_ut,
     cl_flag = p_ut is not None and any(p_ut > 0)  # presence of CL ---> presence of HSS
     hss_flag = size_hss is not None
 
-# LpProblem indítása
+    # LpProblem indítása
     prob = pulp.LpProblem("Opt_HP_Model", pulp.LpMinimize)
 
     # Useful parameters
@@ -173,15 +171,6 @@ def optimize(p_pv, p_consumed, p_ut,
 
         # Zóna és tömeg dinamikák (Euler diszkrét)
         if t < n_timestep - 1:
-
-            # delta = 0.5  # hiszterézis
-            #
-            # temp_diff = T_init - T_zone[t]
-            # if abs(temp_diff) > delta:
-            #     p_hp_th[t] = np.clip(temp_diff * C_zone / dt, -size_hp, size_hp)
-            # else:
-            #     p_hp_th[t] = 0.0
-
             prob += T_zone[k] - T_zone[t] == dt / C_zone * (
                     (T_mass[t] - T_zone[t]) / R_conv + (T_mass[t] - T_zone[t]) / R_rad +
                     (T_env_vector[t] - T_zone[t]) / R_ve + Q_solar[t] + p_hp_th[t]
@@ -369,24 +358,20 @@ df_filtered = df.resample("1h").agg({
     'solar_radiation_direct': 'mean',  # átlagos direkt irradiancia (W/m²)
     'solar_radiation_diffuse': 'mean'  # átlagos szórt irradiancia (W/m²)
 })
-# Hiányzó hőmérsékletek pótlása
-df_filtered['temperature'] = (
-    df_filtered['temperature']
-    .interpolate(method='linear')
-    .bfill()
-    .ffill()
-)
+# Hiányzó hőmérséklet és napenergia adatok pótlása
+for col in ['temperature', 'solar_radiation_direct', 'solar_radiation_diffuse']:
+    df_filtered[col] = (
+        df_filtered[col]
+        .interpolate(method='linear')
+        .bfill()
+        .ffill()
+    )
 na_values = df_filtered.values
 T_env = na_values[:, 4]
 COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env - 5)))
-print("Any NaN in T_env?", np.isnan(na_values[:, 4]).any())
-print("Any NaN in solar_direct?", np.isnan(na_values[:, 5]).any())
-print("Any NaN in solar_diffuse?", np.isnan(na_values[:, 6]).any())
-print("Any NaN in COP?", np.isnan(COP).any())
 results, status, objective, num_vars, num_constraints = optimize(na_values[:, 1], na_values[:, 0], na_values[:, 2],
                                                                  size_elh=4, size_bess=20, size_hss=130, run_lp=True,
                                                                  objective="environmental", T_env_vector=T_env,
                                                                  cop_hp_vector=COP,
                                                                  solar_radiation_direct=na_values[:, 5],
                                                                  solar_radiation_diffuse=na_values[:, 6])
-

@@ -5,64 +5,64 @@ from pulp import LpStatusOptimal
 import pandas as pd
 
 
-def compute_thermal_params(
-        floor_area, volume,
-        wall_area, roof_area, window_area,
-        U_wall, U_roof, U_window,
-        ACH, wall_thickness, roof_thickness,
-        wall_density, roof_density,
-        c_air, air_density, c_wall
-):
-    """
-    Számolja a zóna (5R/2C) paramétereit a geometriából és anyagadatokból.
-    Visszaadja:
-      C_zone  - beltéri levegő és berendezések hőtárolási kapacitása [J/K]
-      C_mass  - szerkezeti tömeg hőtárolási kapacitása [J/K]
-      R_conv  - belső felületés levegő közti konvekciós ellenállás [K/kW]
-      R_ve    - zóna és külső környezet összesített hőátbocsátása (ablak+infiltráció) [K/kW]
-      R_ea    - szerkezet és külső környezet vezetési ellenállása (fal+tető) [K/kW]
-      R_rad   - sugárzási ellenállás felületek között [K/kW]
-    """
-    # beltéri levegő + bútorok kapacitás
-    mass_air = air_density * volume  # kg
-    C_zone = mass_air * c_air  # J/K
-    # szerkezeti tömeg kapacitás (falak + födém)
-    wall_mass = wall_density * wall_area * wall_thickness  # kg
-    roof_mass = roof_density * roof_area * roof_thickness  # kg
-    C_mass = (wall_mass + roof_mass) * c_wall  # J/K
-    # hőellenállások
-    R_wall = 1.0 / (U_wall * wall_area)  # K/kW
-    R_roof = 1.0 / (U_roof * roof_area)
-    R_window = 1.0 / (U_window * window_area)
-    # szellőzés és ablakinfiltráció
-    m_dot = ACH * mass_air / 3600.0  # kg/s
-    U_infil = m_dot * c_air / 1000.0  # kW/K
-    R_infil = 1.0 / U_infil if U_infil > 0 else 1e6
-    # belső konvekció
-    interior_area = wall_area + roof_area + floor_area  # m2
-    h_int = 3.0  # W/(m2 K)
-    R_conv = 1.0 / (h_int * interior_area)  # K/kW
-    # zóna <-> környezet (ablak+infiltráció párhuzamosan)
-    R_ve = (R_window * R_infil) / (R_window + R_infil)
-    # szerkezet <-> külső (fal+tető sorosan)
-    R_ea = R_wall + R_roof
-    # sugárzási ellenállás vélelmezett értéke
-    R_rad = 0.20
-    return C_zone, C_mass, R_conv, R_ve, R_ea, R_rad
+# def compute_thermal_params(
+#         floor_area, volume,
+#         wall_area, roof_area, window_area,
+#         U_wall, U_roof, U_window,
+#         ACH, wall_thickness, roof_thickness,
+#         wall_density, roof_density,
+#         c_air, air_density, c_wall
+# ):
+#     """
+#     Számolja a zóna (5R/2C) paramétereit a geometriából és anyagadatokból.
+#     Visszaadja:
+#       C_zone  - beltéri levegő és berendezések hőtárolási kapacitása [J/K]
+#       C_mass  - szerkezeti tömeg hőtárolási kapacitása [J/K]
+#       R_conv  - belső felületés levegő közti konvekciós ellenállás [K/kW]
+#       R_ve    - zóna és külső környezet összesített hőátbocsátása (ablak+infiltráció) [K/kW]
+#       R_ea    - szerkezet és külső környezet vezetési ellenállása (fal+tető) [K/kW]
+#       R_rad   - sugárzási ellenállás felületek között [K/kW]
+#     """
+#     # beltéri levegő + bútorok kapacitás
+#     mass_air = air_density * volume  # kg
+#     C_zone = mass_air * c_air / 3.6e6  # kWh/K
+#     # szerkezeti tömeg kapacitás (falak + födém)
+#     wall_mass = wall_density * wall_area * wall_thickness  # kg
+#     roof_mass = roof_density * roof_area * roof_thickness  # kg
+#     C_mass = (wall_mass + roof_mass) * c_wall / 3.6e6  # kWh/K
+#     # hőellenállások
+#     R_wall = 1000.0 / (U_wall * wall_area)  # K/kW
+#     R_roof = 1000.0 / (U_roof * roof_area)  # K/kW
+#     R_window = 1000.0 / (U_window * window_area)  # K/kW
+#     # szellőzés és ablakinfiltráció
+#     m_dot = ACH * mass_air / 3600.0  # kg/s
+#     U_infil = m_dot * c_air / 1000.0  # kW/K
+#     R_infil = 1.0 / U_infil if U_infil > 0 else 1e6
+#     # belső konvekció
+#     interior_area = wall_area + roof_area + floor_area  # m2
+#     h_int = 3.0  # W/(m2 K)
+#     R_conv = 1.0 / (h_int * interior_area)  # K/kW
+#     # zóna <-> környezet (ablak+infiltráció párhuzamosan)
+#     R_ve = (R_window * R_infil) / (R_window + R_infil)
+#     # szerkezet <-> külső (fal+tető sorosan)
+#     R_ea = R_wall + R_roof
+#     # sugárzási ellenállás vélelmezett értéke
+#     R_rad = 0.20
+#     return C_zone, C_mass, R_conv, R_ve, R_ea, R_rad
 
 
-def cop_hp(T_env):
-    return 0.05 * T_env + 2.5
+# def cop_hp(T_env):
+#     return 0.05 * T_env + 2.5
 
 
 def optimize(p_pv, p_consumed, p_ut,
              T_env_vector, cop_hp_vector,
              dt=1,
              size_elh=None, size_bess=None, size_hss=None,
-             size_hp=6.0,
+             size_hp=10,
              vol_hss_water=None,
              run_lp=False,
-             T_set=21.0, T_init=21.0, absorption_coeff=0.7,
+             T_set=21.0, T_init=21.0,
              **kwargs):
     """
     Extended CSC optimization including:
@@ -79,7 +79,6 @@ def optimize(p_pv, p_consumed, p_ut,
 
     time_set = range(n_timestep)
     n_timesteps_in_a_day = round(n_timestep / 365.)
-    dt_s = dt * 3600.0
 
     # Eredeti modell paraméterek
     eta_bess_in = kwargs.get('eta_bess_in', 0.98)
@@ -104,36 +103,65 @@ def optimize(p_pv, p_consumed, p_ut,
     c_sh = kwargs.get('c_sh', 0.0024)
     objective = kwargs.get('objective', 'economic')
 
-    # Geometriai és anyagparaméterek lekérdezése
-    floor_area = kwargs.get('floor_area', 100.0)  # m2
-    volume = kwargs.get('volume', 250.0)  # m3
-    wall_area = kwargs.get('wall_area', 100.0)  # m2
-    roof_area = kwargs.get('roof_area', 100.0)  # m2
-    window_area = kwargs.get('window_area', 15.0)  # m2
-    U_wall = kwargs.get('U_wall', 0.25)  # W/(m2K)
-    U_roof = kwargs.get('U_roof', 0.25)  # W/(m2K)
-    U_window = kwargs.get('U_window', 1.20)  # W/(m2K)
-    ACH = kwargs.get('ACH', 0.50)  # 1/h
-    wall_thickness = kwargs.get('wall_thickness', 0.30)  # m
-    roof_thickness = kwargs.get('roof_thickness', 0.20)  # m
-    wall_density = kwargs.get('wall_density', 1800.0)  # kg/m3
-    roof_density = kwargs.get('roof_density', 1800.0)  # kg/m3
-    c_air = kwargs.get('c_air', 1005.0)  # J/(kgK)
-    air_density = kwargs.get('air_density', 1.20)  # kg/m3
-    c_wall = kwargs.get('c_wall', 840.0)  # J/(kgK)
+    # # Geometriai és anyagparaméterek lekérdezése
+    # floor_area = kwargs.get('floor_area', 100.0)  # m2
+    # volume = kwargs.get('volume', 250.0)  # m3
+    # wall_area = kwargs.get('wall_area', 120.0)  # m2
+    # roof_area = kwargs.get('roof_area', 130.0)  # m2
+    # window_area = kwargs.get('window_area', 25.0)  # m2
+    # U_wall = kwargs.get('U_wall', 0.20)  # W/(m2K)
+    # U_roof = kwargs.get('U_roof', 0.20)  # W/(m2K)
+    # U_window = kwargs.get('U_window', 1.00)  # W/(m2K)
+    # ACH = kwargs.get('ACH', 0.50)  # 1/h
+    # wall_thickness = kwargs.get('wall_thickness', 0.40)  # m
+    # roof_thickness = kwargs.get('roof_thickness', 0.40)  # m
+    # wall_density = kwargs.get('wall_density', 1800.0)  # kg/m3
+    # roof_density = kwargs.get('roof_density', 1800.0)  # kg/m3
+    # c_air = kwargs.get('c_air', 1005.0)  # J/(kgK)
+    # air_density = kwargs.get('air_density', 1.20)  # kg/m3
+    # c_wall = kwargs.get('c_wall', 840.0)  # J/(kgK)
+    #
+    # # 5R/2C paraméterek előállítása
+    # C_zone, C_mass, R_conv, R_ve, R_ea, R_rad = compute_thermal_params(
+    #     floor_area, volume,
+    #     wall_area, roof_area, window_area,
+    #     U_wall, U_roof, U_window,
+    #     ACH, wall_thickness, roof_thickness,
+    #     wall_density, roof_density,
+    #     c_air, air_density, c_wall
+    # )
+    # # Védelem NaN/inf ellen (itt javasolt beilleszteni!)
+    # R_rad = max(R_rad, 1e-3)
+    # R_ve = max(R_ve, 1e-3)
+    # R_conv = max(R_conv, 1e-3)
+    # R_ea = max(R_ea, 1e-3)
 
-    # 5R/2C paraméterek előállítása
-    C_zone, C_mass, R_conv, R_ve, R_ea, R_rad = compute_thermal_params(
-        floor_area, volume,
-        wall_area, roof_area, window_area,
-        U_wall, U_roof, U_window,
-        ACH, wall_thickness, roof_thickness,
-        wall_density, roof_density,
-        c_air, air_density, c_wall
-    )
+    # --- Paraméterek ---
+    dt = 1  # [h]
+    C_zone = 4.16  # [kWh/K]
+    C_mass = 37.97  # [kWh/K]
+    R_conv = 0.75  # [K/kW]
+    R_rad = 0.2  # [K/kW]
+    R_ve = 14.95  # [K/kW]
+    R_ea = 80.13  # [K/kW]
+    window_area = 15  # [m^2]
+    g_window = 0.6  # [1]
+    solar_gain_factor = 0.3
 
-    q_solar = absorption_coeff * np.array(p_pv)
-    cop_hp_vector = cop_hp(np.array(T_env_vector))
+    # Napenergia‐nyereséghez szükséges vektorok
+    solar_dir = kwargs.get('solar_radiation_direct')
+    solar_dif = kwargs.get('solar_radiation_diffuse')
+
+    if solar_dir is None or solar_dif is None:
+        raise ValueError("Hiányzik solar_radiation_direct vagy solar_radiation_diffuse")
+    # Globális horizontális irradiancia [kW/m2]
+    G_hor = (solar_dir + solar_dif) / 1000.0
+    # # Ablak napenergia‐átbocsátási tényező (g‐érték)
+    # g_window = kwargs.get('g_window', 0.7)
+    # Sorozat [kW]
+    Q_solar = list(g_window * window_area * G_hor)
+    # VÉDELEM: ha van benne inf vagy NaN, cseréljük le 0-ra
+    Q_solar = [float(q) if np.isfinite(q) else 0.0 for q in Q_solar]
 
     # Solver parameters
     msg = kwargs.get('msg', True)  # print messages during optimization
@@ -171,7 +199,7 @@ def optimize(p_pv, p_consumed, p_ut,
     # ------------------------------------------------------------
     # ÚJ változók: hőszivattyú és zóna modell
     d_hp = [pulp.LpVariable(f'd_hp_heat_{t}', cat=pulp.LpBinary) for t in time_set]
-    p_hp_th = [pulp.LpVariable(f'p_hp_th{t}', lowBound=0, upBound=size_hp) for t in time_set]
+    p_hp_th = [pulp.LpVariable(f'p_hp_th{t}', lowBound=-size_hp, upBound=size_hp) for t in time_set]
     p_hp_el = [pulp.LpVariable(f'p_hp_el{t}', lowBound=0) for t in time_set]
     T_zone = [pulp.LpVariable(f'T_zone_{t}', lowBound=10, upBound=30) for t in time_set]
     T_mass = [pulp.LpVariable(f'T_mass_{t}', lowBound=0, upBound=50) for t in time_set]
@@ -220,10 +248,13 @@ def optimize(p_pv, p_consumed, p_ut,
 
         # --------------------------------------------------------
         # HP-COP kapcsolat
-        prob += p_hp_el[t] == p_hp_th[t] * (1 / cop_hp_vector[t])
+        cop_cool = 2.8
+        prob += p_hp_el[t] >= (1 / cop_hp_vector[t]) * p_hp_th[t]
+        prob += p_hp_el[t] >= -(1 / cop_cool) * p_hp_th[t]
 
         # HP kapacitás bináris vezérlés
         prob += p_hp_th[t] <= size_hp * d_hp[t]
+        prob += p_hp_th[t] >= -size_hp * d_hp[t]
 
         # Komfort-feltétel: zónahőmérséklet
         prob += T_zone[t] >= T_set - 2.0  # Pl. 19 °C is elfogadható minimálisan
@@ -234,12 +265,32 @@ def optimize(p_pv, p_consumed, p_ut,
         # Zóna és tömeg dinamikák (Euler diszkrét)
         if t < n_timestep - 1:
             # Zóna energiamérleg: belső tömeg, HP, szoláris nyereség
-            # TODO: q_solar nélkül?
-            prob += C_zone * (T_zone[k] - T_zone[t]) == dt_s * (
-                    (T_mass[t] - T_zone[t]) / R_conv + p_hp_th[t] + q_solar[t]
+            # prob += C_zone * (T_zone[k] - T_zone[t]) == dt * (
+            #         (T_mass[t] - T_zone[t]) * (1 / R_conv) + p_hp_th[t] + (T_mass[t] - T_zone[t]) * (1 / R_rad)
+            #         + (T_env_vector[t] - T_zone[t]) * (1 / R_ve) + Q_solar[t])
+            # prob += C_mass * (T_mass[k] - T_mass[t]) == dt * (
+            #         (T_zone[t] - T_mass[t])* (1 / R_conv) + (T_env_vector[t] - T_mass[t]) * (1 / R_ea) + (
+            #             T_zone[t] - T_mass[t]) * (1 / R_rad))
+
+            # jobb oldal résztagjai külön változókban
+            conv_heat = (T_mass[t] - T_zone[t]) * (1 / R_conv)
+            rad_heat = (T_mass[t] - T_zone[t]) * (1 / R_rad)
+            infil_heat = (T_env_vector[t] - T_zone[t]) * (1 / R_ve)
+            solar_heat = Q_solar[t]
+            hp_heat = p_hp_th[t]
+
+            # zóna energiamérleg
+            prob += C_zone * (T_zone[k] - T_zone[t]) == dt * (
+                    conv_heat + rad_heat + infil_heat + solar_heat + hp_heat
             )
-            prob += C_mass * (T_mass[k] - T_mass[t]) == dt_s * (
-                    (T_zone[t] - T_mass[t]) / R_conv + (T_env_vector[t] - T_mass[t]) / R_ea)
+            conv_rev = (T_zone[t] - T_mass[t]) * (1 / R_conv)
+            rad_rev = (T_zone[t] - T_mass[t]) * (1 / R_rad)
+            wall_loss = (T_env_vector[t] - T_mass[t]) * (1 / R_ea)
+
+            prob += C_mass * (T_mass[k] - T_mass[t]) == dt * (
+                    conv_rev + rad_rev + wall_loss
+            )
+
         # --------------------------------------------------------
 
         # --- eredeti BESS, HSS, CL, grid megszorítások ---
@@ -390,7 +441,7 @@ def optimize(p_pv, p_consumed, p_ut,
 
     p_elh_in = [0 if v is None else v for v in p_elh_in]
     p_elh_out = [0 if v is None else v for v in p_elh_out]
-    e_hss_stor = vol_hss_water * c_hss * (np.array(t_hss) - T_env) / dt
+    e_hss_stor = vol_hss_water * c_hss * (np.array(t_hss) - T_env)
 
     results = dict(p_inj=np.array(p_inj), p_with=np.array(p_with),
                    p_bess_in=np.array(p_bess_in), p_bess_out=np.array(p_bess_out), e_bess_stor=np.array(e_bess_stor),
@@ -401,32 +452,89 @@ def optimize(p_pv, p_consumed, p_ut,
                    p_shared=np.array(p_shared), p_grid_out=np.array(p_grid_out),
                    p_grid_in=np.array(p_grid_in), d_cl=np.array(d_cl), p_ue=np.array(p_consumed),
                    p_hp_th=np.array(p_hp_th), p_hp_el=np.array(p_hp_el), d_hp=np.array(d_hp), T_zone=np.array(T_zone),
-                   T_mass=np.array(T_mass))
+                   T_mass=np.array(T_mass), p_pv=p_pv, p_consumed=p_consumed, p_ut=p_ut)
     return results, status, pulp.value(prob.objective), prob.numVariables(), prob.numConstraints()
 
 
 df = pd.read_csv('input.csv', sep=';', index_col=0, parse_dates=True)
-# df_filtered = df[~df.index.astype(str).str.contains(":15|:30|:45", regex=True)]  # df.resample("1h").first()
-df_filtered = df.resample("1h").sum()
-na_values = df_filtered.values  # numpy array
+# negyedórás → órás felbontás
+df_filtered = df.resample("1h").agg({
+    'consumer1': 'sum',  # energiamérleg-igények összeadása
+    'pv1': 'sum',  # PV-termelés összeadva (kWh)
+    'thermal_user1': 'sum',  # fűtési igény összeadva (kWh)
+    'dhw': 'sum',  # DHW-igény összeadva (kWh)
+    'temperature': 'mean',  # átlagos külső hőmérséklet (°C)
+    'solar_radiation_direct': 'mean',  # átlagos direkt irradiancia (W/m²)
+    'solar_radiation_diffuse': 'mean'  # átlagos szórt irradiancia (W/m²)
+})
 
-np.random.seed(42)
-hours = 8760
-t = np.arange(hours)
+# Hiányzó hőmérséklet és napenergia adatok pótlása
+for col in ['temperature', 'solar_radiation_direct', 'solar_radiation_diffuse']:
+    df_filtered[col] = (
+        df_filtered[col]
+        .interpolate(method='linear')
+        .bfill()
+        .ffill()
+    )
 
-T_env = (
-        10 + 10 * np.sin(2 * np.pi * t / hours - np.pi / 2)
-        + 3 * np.sin(2 * np.pi * t / 24)
-        + np.random.normal(0, 1.0, hours)
-)
-
-COP = np.clip(6.0 - 0.25 * T_env, 1.5, 6.0)
-
-df = pd.DataFrame({"T_env": T_env, "COP": COP})
-df.to_csv("T_env_COP_8760.csv", index=False)
+na_values = df_filtered.values
+T_env = na_values[:, 4]
+COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env - 5)))
 
 results, status, objective, num_vars, num_constraints = optimize(na_values[:, 1], na_values[:, 0], na_values[:, 2],
                                                                  size_elh=4, size_bess=20, size_hss=130, run_lp=True,
                                                                  objective="environmental", T_env_vector=T_env,
-                                                                 cop_hp_vector=COP)
+                                                                 cop_hp_vector=COP,
+                                                                 solar_radiation_direct=na_values[:, 5],
+                                                                 solar_radiation_diffuse=na_values[:, 6])
 
+
+time_index = pd.date_range(start=df_filtered.index[0], periods=len(results["T_zone"]), freq="h")
+
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+
+# Évszakok hetének kezdőindexei az évben (óra alapú)
+weeks = {
+    "Tél": 0,                # január első hete
+    "Tavasz": 24 * 90,       # április eleje
+    "Nyár": 24 * 180,        # július eleje
+    "Ősz": 24 * 270          # október eleje
+}
+hours_in_week = 24 * 7
+
+fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(16, 12), gridspec_kw={'height_ratios': [2, 0.5]*2})
+
+# Flatten axes
+axes = axes.reshape(4, 2)
+
+for idx, (season, start_hour) in enumerate(weeks.items()):
+    end_hour = start_hour + hours_in_week
+    t_range = time_index[start_hour:end_hour]
+
+    # Felső diagram: hőmérsékletek
+    ax1 = axes[idx, 0]
+    ax1.plot(t_range, results["T_zone"][start_hour:end_hour], label="T_zone", linewidth=1.2)
+    ax1.plot(t_range, results["T_mass"][start_hour:end_hour], label="T_mass", linewidth=1.2)
+    ax1.plot(t_range, T_env[start_hour:end_hour], label="T_env", linestyle="--", linewidth=1.2)
+    ax1.set_ylabel("Hőmérséklet [°C]")
+    ax1.set_title(f"{season} - Hőmérsékletek")
+    ax1.legend(loc="upper right")
+    ax1.grid(True)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+
+    # Alsó diagram: hőszivattyú működés
+    ax2 = axes[idx, 1]
+    hp_week = results["d_hp"][start_hour:end_hour]
+    ax2.fill_between(t_range, 0, hp_week, step="pre", color="orange", alpha=0.6, label="HP működik")
+    ax2.set_ylim(0, 1.1)
+    ax2.set_yticks([0, 1])
+    ax2.set_yticklabels(["Ki", "Be"])
+    ax2.set_ylabel("HP")
+    ax2.set_xlabel("Dátum")
+    ax2.grid(True)
+    ax2.legend(loc="upper right")
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+
+plt.tight_layout()
+plt.show()
