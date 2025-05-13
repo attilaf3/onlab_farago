@@ -331,7 +331,7 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(
     p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed,
     size_elh=np.array([2, 2.5]), size_bess=20, size_hss=np.array([100, 120]), run_lp=False, objective="environmental",
-    gapRel=0.001
+    gapRel=0.005
 )
 
 # Eredmények megjelenítése

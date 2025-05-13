@@ -221,7 +221,7 @@ def extract_results_and_show(results):
 
 
 results, status, objective, num_vars, num_constraints = optimize(na_values[:, 1], na_values[:, 0], na_values[:, 2],
-                                                                 size_elh=4, size_bess=20, size_hss=130, run_lp=False,
+                                                                 size_elh=2, size_bess=10, size_hss=5, run_lp=False,
                                                                  objective="environmental")
 # results, status, objective, num_vars, num_constraints = optimize(na_values[:, 0], na_values[:, 1], na_values[:, 2], size_elh=4, size_bess=20)
 extract_results_and_show(results)
