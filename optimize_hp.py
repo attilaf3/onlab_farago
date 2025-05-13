@@ -8,7 +8,7 @@ def optimize(p_pv, p_consumed, p_ut,
              T_env_vector, cop_hp_vector,
              dt=1,
              size_elh=None, size_bess=None, size_hss=None,
-             size_hp=10,
+             size_hp=4,
              vol_hss_water=None,
              run_lp=False,
              T_set=21.0, T_init=21.0,
@@ -179,8 +179,6 @@ def optimize(p_pv, p_consumed, p_ut,
                     (T_zone[t] - T_mass[t]) / R_conv + (T_zone[t] - T_mass[t]) / R_rad +
                     (T_env_vector[t] - T_mass[t]) / R_ea
             )
-            prob += T_zone[t + 1] == T_zone[k]
-            prob += T_mass[t + 1] == T_mass[k]
 
             # --------------------------------------------------------
 
@@ -370,8 +368,36 @@ na_values = df_filtered.values
 T_env = na_values[:, 4]
 COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env - 5)))
 results, status, objective, num_vars, num_constraints = optimize(na_values[:, 1], na_values[:, 0], na_values[:, 2],
-                                                                 size_elh=4, size_bess=20, size_hss=130, run_lp=True,
+                                                                 size_elh=2, size_bess=10, size_hss=4, run_lp=False,
                                                                  objective="environmental", T_env_vector=T_env,
                                                                  cop_hp_vector=COP,
                                                                  solar_radiation_direct=na_values[:, 5],
                                                                  solar_radiation_diffuse=na_values[:, 6])
+
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+hp_el = results["p_hp_el"]
+time_index = pd.date_range(start=df_filtered.index[0], periods=len(hp_el), freq="h")
+
+# Hőszivattyú villamos teljesítmény lekérdezése
+hp_el = results["p_hp_el"]
+
+# DataFrame létrehozása
+df_hp_el = pd.DataFrame(data={"p_hp_el [kW]": hp_el}, index=time_index)
+
+# CSV mentés
+df_hp_el.to_csv("hp_el_output.csv", sep=';', index_label="time")
+
+plt.figure(figsize=(15, 5))
+plt.plot(time_index, hp_el, label="HP villamos teljesítmény", color="tab:blue", linewidth=1.2)
+plt.xlabel("Idő")
+plt.ylabel("Teljesítmény [kW]")
+plt.title("Hőszivattyú által felvett villamos teljesítmény alakulása")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
