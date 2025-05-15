@@ -222,7 +222,7 @@ def extract_results_and_show(results):
 
 
 results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
-                                                                 size_elh=2, size_bess=10, size_hss=6, run_lp=False,
+                                                                 size_elh=2, size_bess=20, size_hss=6, run_lp=False,
                                                                  objective="environmental")
 extract_results_and_show(results)
 
@@ -241,7 +241,7 @@ ss_optimal = np.zeros(shape)
 base_pv = df_filtered['pv1'].values
 p_consumed = df_filtered['consumer1'].values
 p_ut_profile = df_filtered['thermal_user1'].values
-p_dhw = df_filtered['p_dhw'].values
+p_dhw = df_filtered['dhw'].values
 
 for i, pv_ratio in enumerate(pv_ratios):
     for j, bess_size in enumerate(bess_sizes):
