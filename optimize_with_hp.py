@@ -47,7 +47,7 @@ def optimize(p_pv, p_consumed, p_ut,
     T_max = kwargs.get('T_max', 55)
     T_in = kwargs.get('T_in', 12)  # °C
     T_min = T_in
-    vol_hss_water = kwargs.get('vol_hss_water', 3200)  # l/kg
+    vol_hss_water = kwargs.get('vol_hss_water', 120)  # l/kg
     eta_elh = kwargs.get('eta_elh', 1)
     c_with = kwargs.get('c_with', 0.092)
     c_cl = kwargs.get('c_cl', 0.061)
@@ -391,15 +391,20 @@ for col in ['temperature', 'solar_radiation_direct', 'solar_radiation_diffuse']:
     )
 
 na_values = df_filtered.values
+p_consumed = na_values[:, 0]
+p_pv = na_values[:, 1]
+p_ut = na_values[:, 2]
 T_env = na_values[:, 4]
+solar_dir = na_values[:, 5]
+solar_dif = na_values[:, 6]
 COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env - 5)))
 
-results, status, objective, num_vars, num_constraints = optimize(na_values[:, 1], na_values[:, 0], na_values[:, 2],
-                                                                 size_elh=2, size_bess=10, size_hss=4, run_lp=False,
+results, status, objective, num_vars, num_constraints = optimize(p_pv=p_pv, p_consumed=p_consumed, p_ut=p_ut,
+                                                                 size_elh=2, size_bess=10, size_hss=6, run_lp=False,
                                                                  objective="environmental", T_env_vector=T_env,
                                                                  cop_hp_vector=COP,
-                                                                 solar_radiation_direct=na_values[:, 5],
-                                                                 solar_radiation_diffuse=na_values[:, 6])
+                                                                 solar_radiation_direct=solar_dir,
+                                                                 solar_radiation_diffuse=solar_dif, gaprel=0.005)
 
 
 time_index = pd.date_range(start=df_filtered.index[0], periods=len(results["T_zone"]), freq="h")
@@ -465,5 +470,56 @@ plt.ylabel("Teljesítmény [kW]")
 plt.title("Hőszivattyú által felvett villamos teljesítmény alakulása")
 plt.grid(True)
 plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+
+# Időindex és részterhelés kiszámítása
+time_index = pd.date_range(start=df_filtered.index[0], periods=len(results["p_hp_el"]), freq="h")
+hp_el = np.array(results["p_hp_el"])
+max_hp = hp_el.max()
+partial_load = hp_el / max_hp
+
+# Évszakok hetének kezdőindexei az évben (óra alapú)
+weeks = {
+    "Tél": 0,                # január első hete
+    "Tavasz": 24 * 90,       # április eleje
+    "Nyár": 24 * 180,        # július eleje
+    "Ősz": 24 * 270          # október eleje
+}
+hours_in_week = 24 * 7
+
+# Diagramkészítés
+fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(16, 12), gridspec_kw={'height_ratios': [2, 0.5]*2})
+axes = axes.reshape(4, 2)
+
+for idx, (season, start_hour) in enumerate(weeks.items()):
+    end_hour = start_hour + hours_in_week
+    t_range = time_index[start_hour:end_hour]
+
+    # Bal oldali subplot: hőmérsékletek
+    ax1 = axes[idx, 0]
+    ax1.plot(t_range, results["T_zone"][start_hour:end_hour], label="T_zone", linewidth=1.2)
+    ax1.plot(t_range, results["T_mass"][start_hour:end_hour], label="T_mass", linewidth=1.2)
+    ax1.plot(t_range, T_env[start_hour:end_hour], label="T_env", linestyle="--", linewidth=1.2)
+    ax1.set_ylabel("Hőmérséklet [°C]")
+    ax1.set_title(f"{season} - Hőmérsékletek")
+    ax1.legend(loc="upper right")
+    ax1.grid(True)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+
+    # Jobb oldali subplot: részterhelés
+    ax2 = axes[idx, 1]
+    ax2.plot(t_range, partial_load[start_hour:end_hour], color="tab:red", linewidth=1.2, label="HP részterhelés")
+    ax2.set_ylim(0, 1.1)
+    ax2.set_ylabel("Részterhelés")
+    ax2.set_xlabel("Dátum")
+    ax2.grid(True)
+    ax2.legend(loc="upper right")
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+
 plt.tight_layout()
 plt.show()

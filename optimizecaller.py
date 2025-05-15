@@ -2,6 +2,7 @@ import pandas as pd
 from matplotlib import pyplot as plt, patheffects as pe
 import numpy as np
 from optimize import optimize
+import seaborn as sns
 
 # Ctrl+Shift+Alt+L: code cleanup: hosszú sorok tördelése+importok optimalizálása
 
@@ -220,8 +221,94 @@ def extract_results_and_show(results):
                     p_cl_grid, p_cl_with, e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl, p_grid_in, p_grid_out, p_elh_in)
 
 
-results, status, objective, num_vars, num_constraints = optimize(na_values[:, 1], na_values[:, 0], na_values[:, 2],
-                                                                 size_elh=2, size_bess=10, size_hss=5, run_lp=False,
+results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
+                                                                 size_elh=2, size_bess=10, size_hss=6, run_lp=False,
                                                                  objective="environmental")
-# results, status, objective, num_vars, num_constraints = optimize(na_values[:, 0], na_values[:, 1], na_values[:, 2], size_elh=4, size_bess=20)
 extract_results_and_show(results)
+
+# SC = np.sum(shared) / np.sum(p_pv)
+# SS = np.sum(shared) / (np.sum(p_consumed) + np.sum(p_cl_with))
+
+pv_ratios = [0.25, 0.5, 0.75, 1.0, 1.25]
+bess_sizes = [0, 10, 20, 30, 40]
+
+shape = (len(pv_ratios), len(bess_sizes))
+sc_profile = np.zeros(shape)
+ss_profile = np.zeros(shape)
+sc_optimal = np.zeros(shape)
+ss_optimal = np.zeros(shape)
+
+base_pv = df_filtered['pv1'].values
+p_consumed = df_filtered['consumer1'].values
+p_ut_profile = df_filtered['thermal_user1'].values
+p_dhw = df_filtered['p_dhw'].values
+
+for i, pv_ratio in enumerate(pv_ratios):
+    for j, bess_size in enumerate(bess_sizes):
+        p_pv = base_pv * pv_ratio
+
+        # Profile szcenárió (kézi logika)
+        bess_soc = np.zeros(len(p_pv))
+        grid_in = np.zeros(len(p_pv))
+        bess_out = np.zeros(len(p_pv))
+        shared_profile = np.zeros(len(p_pv))
+        bess_capacity = bess_size
+
+        for t in range(len(p_pv)):
+            demand = p_consumed[t] + p_ut_profile[t]
+            net = p_pv[t] - demand
+            if net >= 0:
+                charge = min(net, bess_capacity - bess_soc[t-1] if t > 0 else bess_capacity)
+                bess_soc[t] = (bess_soc[t-1] if t > 0 else 0) + charge
+                grid_in[t] = net - charge
+            else:
+                discharge = min(-net, bess_soc[t-1] if t > 0 else 0)
+                bess_out[t] = discharge
+                bess_soc[t] = (bess_soc[t-1] if t > 0 else 0) - discharge
+
+        shared_profile = np.minimum(p_pv, p_consumed + p_ut_profile)
+        sc_profile[i, j] = np.sum(shared_profile) / np.sum(p_pv)
+        ss_profile[i, j] = np.sum(shared_profile) / (np.sum(p_consumed) + np.sum(p_ut_profile))
+
+        # Optimalizált szcenárió
+        results, *_ = optimize(p_pv, p_consumed, p_dhw,
+                               size_elh=2, size_bess=bess_size, size_hss=5, vol_hss_water=120,
+                               dt=1, msg=False, objective="environmental")
+        shared = results['p_shared']
+        cl_with = results['p_cl_with']
+
+        sc_optimal[i, j] = np.sum(shared) / np.sum(p_pv)
+        ss_optimal[i, j] = np.sum(shared) / (np.sum(p_consumed) + np.sum(cl_with))
+
+# 1. Heatmapek
+def plot_heatmap(data, title):
+    plt.figure(figsize=(7, 5))
+    ax = sns.heatmap(data, annot=True, fmt=".2f", cmap="YlGnBu",
+                     xticklabels=bess_sizes, yticklabels=pv_ratios)
+    ax.set_xlabel("BESS size [kWh]")
+    ax.set_ylabel("PV ratio")
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.show()
+
+plot_heatmap(sc_profile, "SC - Profile")
+plot_heatmap(ss_profile, "SS - Profile")
+plot_heatmap(sc_optimal, "SC - Optimal Control")
+plot_heatmap(ss_optimal, "SS - Optimal Control")
+
+# 2. Pareto-diagram
+def plot_pareto(sc, ss, label):
+    pts = [(sc[i, j], ss[i, j]) for i in range(len(pv_ratios)) for j in range(len(bess_sizes))]
+    x, y = zip(*pts)
+    plt.scatter(x, y, label=label)
+
+plt.figure(figsize=(7, 5))
+plot_pareto(sc_profile, ss_profile, "Profile")
+plot_pareto(sc_optimal, ss_optimal, "Optimal Control")
+plt.xlabel("SC (Self-Consumption)")
+plt.ylabel("SS (Self-Sufficiency)")
+plt.title("Pareto Diagram: SC vs. SS")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
