@@ -330,9 +330,76 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
 # Optimalizálás futtatása
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(
     p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed,
-    size_elh=np.array([2, 2.5]), size_bess=20, size_hss=np.array([100, 120]), run_lp=False, objective="environmental",
-    gapRel=0.005
+    size_elh=np.array([2, 2.5]), size_bess=20, size_hss=np.array([4, 5]), run_lp=False, objective="environmental",
+    gapRel=0.002
 )
 
 # Eredmények megjelenítése
 extract_results_and_show_two_users(results, na_p_pv, na_p_consumed, na_p_ut)
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+def calculate_ssi_sci(p_shared, p_with, p_pv, p_consumed):
+    total_shared = np.sum(p_shared)
+    total_with = np.sum(p_with)
+    total_pv = np.sum(p_pv)
+    total_consumed = np.sum(p_consumed)
+    ssi = total_shared / total_consumed if total_consumed > 0 else 0
+    sci = total_shared / total_pv if total_pv > 0 else 0
+    return ssi, sci
+
+
+def generate_ssi_sci_heatmaps(results_dict, pv_ratios, bess_sizes, base_pv, base_consumed):
+    ssi_opt = np.zeros((len(bess_sizes), len(pv_ratios)))
+    sci_opt = np.zeros_like(ssi_opt)
+    ssi_prof = np.zeros_like(ssi_opt)
+    sci_prof = np.zeros_like(ssi_opt)
+
+    for i, bess in enumerate(bess_sizes):
+        for j, ratio in enumerate(pv_ratios):
+            res_opt = results_dict["optimal"][(bess, ratio)]
+            res_prof = results_dict["profile"][(bess, ratio)]
+
+            p_pv = base_pv * ratio
+            p_consumed = base_consumed
+
+            ssi_o, sci_o = calculate_ssi_sci(res_opt['p_shared'], res_opt['p_with'], p_pv, p_consumed)
+            ssi_p, sci_p = calculate_ssi_sci(res_prof['p_shared'], res_prof['p_with'], p_pv, p_consumed)
+
+            ssi_opt[i, j] = ssi_o
+            sci_opt[i, j] = sci_o
+            ssi_prof[i, j] = ssi_p
+            sci_prof[i, j] = sci_p
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+    sns.heatmap(ssi_opt, annot=True, fmt=".2f", xticklabels=pv_ratios, yticklabels=bess_sizes, ax=axes[0, 0],
+                cmap="YlGnBu")
+    axes[0, 0].set_title("SSI - Optimal")
+    axes[0, 0].set_xlabel("PV ratio")
+    axes[0, 0].set_ylabel("BESS size [kWh]")
+
+    sns.heatmap(sci_opt, annot=True, fmt=".2f", xticklabels=pv_ratios, yticklabels=bess_sizes, ax=axes[0, 1],
+                cmap="YlGnBu")
+    axes[0, 1].set_title("SCI - Optimal")
+    axes[0, 1].set_xlabel("PV ratio")
+    axes[0, 1].set_ylabel("BESS size [kWh]")
+
+    sns.heatmap(ssi_prof, annot=True, fmt=".2f", xticklabels=pv_ratios, yticklabels=bess_sizes, ax=axes[1, 0],
+                cmap="YlOrRd")
+    axes[1, 0].set_title("SSI - Profile control")
+    axes[1, 0].set_xlabel("PV ratio")
+    axes[1, 0].set_ylabel("BESS size [kWh]")
+
+    sns.heatmap(sci_prof, annot=True, fmt=".2f", xticklabels=pv_ratios, yticklabels=bess_sizes, ax=axes[1, 1],
+                cmap="YlOrRd")
+    axes[1, 1].set_title("SCI - Profile control")
+    axes[1, 1].set_xlabel("PV ratio")
+    axes[1, 1].set_ylabel("BESS size [kWh]")
+
+    plt.tight_layout()
+    plt.show()
+
+
