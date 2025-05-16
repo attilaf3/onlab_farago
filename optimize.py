@@ -306,6 +306,6 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
                    t_hss=np.array(t_hss), p_cl_grid=np.array(p_cl_grid), p_cl_rec=np.array(p_cl_rec),
                    p_cl_with=np.array(p_cl_with),
                    p_shared=np.array(p_shared), p_grid_out=np.array(p_grid_out),
-                   p_grid_in=np.array(p_grid_in), d_cl=np.array(d_cl), p_ue=np.array(p_consumed))
+                   p_grid_in=np.array(p_grid_in), d_cl=np.array(d_cl), p_consumed=np.array(p_consumed))
 
     return results, status, objective, prob.numVariables(), prob.numConstraints()

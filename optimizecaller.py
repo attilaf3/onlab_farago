@@ -157,15 +157,27 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
         p_shared_plot = np.minimum(p_inj_plot, p_with_plot)
 
         # Plot
-        ax.plot(time, p_inj[t0:tf], label=r'$P_\mathrm{inj}$', color='tab:red', **plot_kw)
-        ax.plot(time, p_with[t0:tf], label=r'$P_\mathrm{with}$', color='tab:blue', **plot_kw)
-        ax.plot(time, p_shared[t0:tf], label=r'$P_\mathrm{shared}$', color='tab:green', ls='', marker='s', **plot_kw)
+        # ax.plot(time, p_inj[t0:tf], label=r'$P_\mathrm{inj}$', color='tab:red', **plot_kw)
+        # ax.plot(time, p_with[t0:tf], label=r'$P_\mathrm{with}$', color='tab:blue', **plot_kw)
+        # ax.plot(time, p_shared[t0:tf], label=r'$P_\mathrm{shared}$', color='tab:green', ls='', marker='s', **plot_kw)
+
+        # Sima görbék vonalként, nem marker
+        ax.plot(t_plot, p_inj_plot, label=r'$P_\mathrm{inj}$', color='tab:red', **plot_kw)
+        ax.plot(t_plot, p_with_plot, label=r'$P_\mathrm{with}$', color='tab:blue', **plot_kw)
+        ax.plot(t_plot, p_shared_plot, label=r'$P_\mathrm{shared}$', color='tab:green', **plot_kw)
+
+        # ax.fill_between(t_plot, p_shared_plot, p_with_plot, where=p_with_plot > p_shared_plot,
+        #                 label=r'E$_\mathrm{\leftarrow grid}$', color='tab:blue', **area_kw)
+        # ax.fill_between(t_plot, p_shared_plot, p_inj_plot, where=p_inj_plot > p_shared_plot,
+        #                 label=r'E$_\mathrm{\rightarrow grid}$', color='tab:red', **area_kw)
+        # ax.fill_between(t_plot, 0, p_shared_plot, where=p_shared_plot > 0, label=r'E$_\mathrm{shared}$',
+        #                 color='tab:green')
         ax.fill_between(t_plot, p_shared_plot, p_with_plot, where=p_with_plot > p_shared_plot,
-                        label=r'E$_\mathrm{\leftarrow grid}$', color='tab:blue', **area_kw)
+                        label=r'E$_\mathrm{\leftarrow grid}$', color='tab:blue', alpha=0.3)
         ax.fill_between(t_plot, p_shared_plot, p_inj_plot, where=p_inj_plot > p_shared_plot,
-                        label=r'E$_\mathrm{\rightarrow grid}$', color='tab:red', **area_kw)
-        ax.fill_between(t_plot, 0, p_shared_plot, where=p_shared_plot > 0, label=r'E$_\mathrm{shared}$',
-                        color='tab:green')
+                        label=r'E$_\mathrm{\rightarrow grid}$', color='tab:red', alpha=0.3)
+        ax.fill_between(t_plot, 0, p_shared_plot, where=p_shared_plot > 0,
+                        label=r'E$_\mathrm{shared}$', color='tab:green', alpha=0.3)
 
         # Adjust and show
         ax.set_xlabel("Time (h)", fontsize=fontsize)
@@ -222,15 +234,12 @@ def extract_results_and_show(results):
 
 
 results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
-                                                                 size_elh=2, size_bess=20, size_hss=6, run_lp=False,
+                                                                 size_elh=2, size_bess=5, size_hss=4, run_lp=False, gapRel=0.002,
                                                                  objective="environmental")
 extract_results_and_show(results)
 
-# SC = np.sum(shared) / np.sum(p_pv)
-# SS = np.sum(shared) / (np.sum(p_consumed) + np.sum(p_cl_with))
-
 pv_ratios = [0.25, 0.5, 0.75, 1.0, 1.25]
-bess_sizes = [0, 10, 20, 30, 40]
+bess_sizes = [0, 5, 10, 15, 20]
 
 shape = (len(pv_ratios), len(bess_sizes))
 sc_profile = np.zeros(shape)
@@ -267,19 +276,25 @@ for i, pv_ratio in enumerate(pv_ratios):
                 bess_soc[t] = (bess_soc[t-1] if t > 0 else 0) - discharge
 
         shared_profile = np.minimum(p_pv, p_consumed + p_ut_profile)
-        sc_profile[i, j] = np.sum(shared_profile) / np.sum(p_pv)
-        ss_profile[i, j] = np.sum(shared_profile) / (np.sum(p_consumed) + np.sum(p_ut_profile))
+        # sc_profile[i, j] = 1 - np.sum(p_pv - shared_profile) / np.sum(p_pv)
+        sc_profile[i, j] = np.sum(np.minimum(p_pv, shared_profile)) / np.sum(p_pv)
+        ss_profile[i, j] = 1 - np.sum(grid_in) / np.sum(p_consumed + p_ut_profile)
 
         # Optimalizált szcenárió
         results, *_ = optimize(p_pv, p_consumed, p_dhw,
-                               size_elh=2, size_bess=bess_size, size_hss=5, vol_hss_water=120,
-                               dt=1, msg=False, objective="environmental")
+                               size_elh=2, size_bess=bess_size, size_hss=4, vol_hss_water=120,
+                               dt=1, msg=False, objective="environmental",gapRel=0.002)
         shared = results['p_shared']
         cl_with = results['p_cl_with']
 
-        sc_optimal[i, j] = np.sum(shared) / np.sum(p_pv)
-        ss_optimal[i, j] = np.sum(shared) / (np.sum(p_consumed) + np.sum(cl_with))
-
+        # PV-ből nem hasznosult energia = export = inj - shared
+        # p_export = results['p_inj'] - results['p_shared']
+        # sc_optimal[i, j] = 1 - np.sum(p_export) / np.sum(p_pv)
+        sc_optimal[i, j] = np.sum(np.minimum(p_pv, results['p_shared'])) / np.sum(p_pv)
+        # Hálózatból vett energia = grid_in
+        # p_grid_in = results['p_grid_in']
+        # ss_optimal[i, j] = 1 - np.sum(p_grid_in) / (np.sum(p_consumed) + np.sum(cl_with))
+        ss_optimal[i, j] = np.sum(results['p_shared']) / (np.sum(results['p_consumed']) + np.sum(results['p_cl_with']))
 # 1. Heatmapek
 def plot_heatmap(data, title):
     plt.figure(figsize=(7, 5))

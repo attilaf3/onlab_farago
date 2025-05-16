@@ -387,31 +387,72 @@ results, status, objective, num_vars, num_constraints = optimize(p_pv=p_pv, p_co
                                                                  solar_radiation_direct=solar_dir,
                                                                  solar_radiation_diffuse=solar_dif, gaprel=0.005)
 
+time_index = pd.date_range(start=df_filtered.index[0], periods=len(results["T_zone"]), freq="h")
 
-# import matplotlib.pyplot as plt
-# import pandas as pd
-#
-# hp_el = results["p_hp_el"]
-# time_index = pd.date_range(start=df_filtered.index[0], periods=len(hp_el), freq="h")
-#
-# # Hőszivattyú villamos teljesítmény lekérdezése
-# hp_el = results["p_hp_el"]
-#
-# # DataFrame létrehozása
-# df_hp_el = pd.DataFrame(data={"p_hp_el [kW]": hp_el}, index=time_index)
-#
-# # CSV mentés
-# df_hp_el.to_csv("hp_el_output.csv", sep=';', index_label="time")
-#
-# plt.figure(figsize=(15, 5))
-# plt.plot(time_index, hp_el, label="HP villamos teljesítmény", color="tab:blue", linewidth=1.2)
-# plt.xlabel("Idő")
-# plt.ylabel("Teljesítmény [kW]")
-# plt.title("Hőszivattyú által felvett villamos teljesítmény alakulása")
-# plt.grid(True)
-# plt.legend()
-# plt.tight_layout()
-# plt.show()
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+
+# Évszakok hetének kezdőindexei az évben (óra alapú)
+weeks = {
+    "Tél": 0,                # január első hete
+    "Tavasz": 24 * 90,       # április eleje
+    "Nyár": 24 * 180,        # július eleje
+    "Ősz": 24 * 270          # október eleje
+}
+hours_in_week = 24 * 7
+
+fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(16, 12), gridspec_kw={'height_ratios': [2, 0.5]*2})
+
+# Flatten axes
+axes = axes.reshape(4, 2)
+
+for idx, (season, start_hour) in enumerate(weeks.items()):
+    end_hour = start_hour + hours_in_week
+    t_range = time_index[start_hour:end_hour]
+
+    # Felső diagram: hőmérsékletek
+    ax1 = axes[idx, 0]
+    ax1.plot(t_range, results["T_zone"][start_hour:end_hour], label="T_zone", linewidth=1.2)
+    ax1.plot(t_range, results["T_mass"][start_hour:end_hour], label="T_mass", linewidth=1.2)
+    ax1.plot(t_range, T_env[start_hour:end_hour], label="T_env", linestyle="--", linewidth=1.2)
+    ax1.set_ylabel("Hőmérséklet [°C]")
+    ax1.set_title(f"{season} - Hőmérsékletek")
+    ax1.legend(loc="upper right")
+    ax1.grid(True)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+
+    # Alsó diagram: hőszivattyú működés
+    ax2 = axes[idx, 1]
+    hp_week = results["d_hp"][start_hour:end_hour]
+    ax2.fill_between(t_range, 0, hp_week, step="pre", color="orange", alpha=0.6, label="HP működik")
+    ax2.set_ylim(0, 1.1)
+    ax2.set_yticks([0, 1])
+    ax2.set_yticklabels(["Ki", "Be"])
+    ax2.set_ylabel("HP")
+    ax2.set_xlabel("Dátum")
+    ax2.grid(True)
+    ax2.legend(loc="upper right")
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+
+plt.tight_layout()
+plt.show()
+# 2. HP teljesítmény grafikon
+import matplotlib.pyplot as plt
+import pandas as pd
+
+hp_el = results["p_hp_el"]
+time_index = pd.date_range(start=df_filtered.index[0], periods=len(hp_el), freq="h")
+
+plt.figure(figsize=(15, 5))
+plt.plot(time_index, hp_el, label="HP villamos teljesítmény", color="tab:blue", linewidth=1.2)
+plt.xlabel("Idő")
+plt.ylabel("Teljesítmény [kW]")
+plt.title("Hőszivattyú által felvett villamos teljesítmény alakulása")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -459,90 +500,6 @@ for idx, (season, start_hour) in enumerate(weeks.items()):
     ax2.grid(True)
     ax2.legend(loc="upper right")
     ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-
-plt.tight_layout()
-plt.show()
-
-
-# === FIX T_env VIZSGÁLAT - 3 OPTIMALIZÁCIÓ ===
-
-T_env_fixed_vals = [15, 20, 25]
-colors = ['tab:blue', 'tab:green', 'tab:red']
-results_by_env = {}
-
-for T_env_fixed in T_env_fixed_vals:
-    T_env_vector = np.full(len(T_env), T_env_fixed)
-    COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env_vector - 5)))
-
-    results_tmp, *_ = optimize(
-        p_pv, p_consumed, p_ut,
-        T_env_vector=T_env_vector,
-        cop_hp_vector=COP,
-        size_elh=2, size_bess=10, size_hss=6,
-        run_lp=False,
-        objective="environmental",
-        solar_radiation_direct=solar_dir,
-        solar_radiation_diffuse=solar_dif
-    )
-
-    hp_el = np.array(results_tmp["p_hp_el"])
-    partial_load = hp_el / hp_el.max()
-
-    results_by_env[T_env_fixed] = {
-        "T_zone": results_tmp["T_zone"],
-        "partial_load": partial_load
-    }
-
-# === ÁBRA KÉSZÍTÉS - TELJES ÉV ===
-
-fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(15, 10), sharex=True)
-
-# Felső: T_zone
-for i, T_env_fixed in enumerate(T_env_fixed_vals):
-    axes[0].plot(time_index, results_by_env[T_env_fixed]["T_zone"],
-                 label=f"T_env = {T_env_fixed}°C", color=colors[i])
-axes[0].set_ylabel("T_zone [°C]")
-axes[0].set_title("Zónahőmérséklet alakulása (fix külső hőmérséklet mellett)")
-axes[0].legend(loc="upper right")
-axes[0].grid(True)
-axes[0].xaxis.set_major_formatter(mdates.DateFormatter('%b'))
-
-# Alsó: részterhelés
-for i, T_env_fixed in enumerate(T_env_fixed_vals):
-    axes[1].plot(time_index, results_by_env[T_env_fixed]["partial_load"],
-                 label=f"T_env = {T_env_fixed}°C", color=colors[i])
-axes[1].set_ylabel("HP részterhelés [-]")
-axes[1].set_xlabel("Idő")
-axes[1].set_title("Hőszivattyú részterhelés (fix külső hőmérséklet mellett)")
-axes[1].legend(loc="upper right")
-axes[1].grid(True)
-axes[1].xaxis.set_major_formatter(mdates.DateFormatter('%b'))
-
-plt.tight_layout()
-plt.show()
-
-# === 6 Subplot: minden T_env eset külön sorban ===
-fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(15, 18), sharex=True)
-
-for i, T_env_fixed in enumerate(T_env_fixed_vals):
-    res = results_by_env[T_env_fixed]
-
-    # Felső subplot: T_zone
-    ax1 = axes[2 * i]
-    ax1.plot(time_index, res["T_zone"], color=colors[i])
-    ax1.set_ylabel("T_zone [°C]")
-    ax1.set_title(f"T_env = {T_env_fixed}°C – Zónahőmérséklet")
-    ax1.grid(True)
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
-
-    # Alsó subplot: részterhelés
-    ax2 = axes[2 * i + 1]
-    ax2.plot(time_index, res["partial_load"], color=colors[i])
-    ax2.set_ylabel("Részterhelés [-]")
-    ax2.set_xlabel("Idő")
-    ax2.set_title(f"T_env = {T_env_fixed}°C – Hőszivattyú részterhelés")
-    ax2.grid(True)
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
 
 plt.tight_layout()
 plt.show()

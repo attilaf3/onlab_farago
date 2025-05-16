@@ -5,8 +5,6 @@ from pulp import LpStatusOptimal
 import pandas as pd
 
 
-
-
 def optimize(p_pv, p_consumed, p_ut,
              T_env_vector, cop_hp_vector,
              dt=1,
@@ -111,12 +109,15 @@ def optimize(p_pv, p_consumed, p_ut,
     M_hp = size_hp / min(cop_hp_vector)
     # ------------------------------------------------------------
     # ÚJ változók: hőszivattyú és zóna modell
-    d_hp = [pulp.LpVariable(f'd_hp_heat_{t}', cat=pulp.LpBinary) for t in time_set]
+    # d_hp = [pulp.LpVariable(f'd_hp_heat_{t}', cat=pulp.LpBinary) for t in time_set]
     p_hp_th = [pulp.LpVariable(f'p_hp_th{t}', lowBound=-size_hp, upBound=size_hp) for t in time_set]
     p_hp_el = [pulp.LpVariable(f'p_hp_el{t}', lowBound=0) for t in time_set]
     T_zone = [pulp.LpVariable(f'T_zone_{t}', lowBound=10, upBound=30) for t in time_set]
     T_mass = [pulp.LpVariable(f'T_mass_{t}', lowBound=0, upBound=50) for t in time_set]
 
+    # ÚJ:
+    d_hp_heat = [pulp.LpVariable(f'd_hp_heat_{t}', cat=pulp.LpBinary) for t in time_set]
+    d_hp_cool = [pulp.LpVariable(f'd_hp_cool_{t}', cat=pulp.LpBinary) for t in time_set]
     # ------------------------------------------------------------
 
     # Eredeti változók (PV, CL, ELH, HSS, BESS, grid stb.)
@@ -166,14 +167,23 @@ def optimize(p_pv, p_consumed, p_ut,
         prob += p_hp_el[t] >= -(1 / cop_cool) * p_hp_th[t]
 
         # HP kapacitás bináris vezérlés
-        prob += p_hp_th[t] <= size_hp * d_hp[t]
-        prob += p_hp_th[t] >= -size_hp * d_hp[t]
+        # prob += p_hp_th[t] <= size_hp * d_hp[t]
+        # prob += p_hp_th[t] >= -size_hp * d_hp[t]
+        # prob += p_hp_el[t] <= M_hp * d_hp[t]
+
+        # irányok kizárják egymást
+        prob += d_hp_heat[t] + d_hp_cool[t] <= 1
+
+        # teljesítmény irányok: fűtés és hűtés külön
+        prob += p_hp_th[t] <= size_hp * d_hp_heat[t]
+        prob += p_hp_th[t] >= -size_hp * d_hp_cool[t]
+
+        # elektromos teljesítmény korlát mindkét irányban
+        prob += p_hp_el[t] <= M_hp * (d_hp_heat[t] + d_hp_cool[t])
 
         # Komfort-feltétel: zónahőmérséklet
         prob += T_zone[t] >= T_set - 2.0  # Pl. 19 °C is elfogadható minimálisan
         prob += T_zone[t] <= T_set + 2.0  # Pl. 23 °C is elfogadható minimálisan
-
-        prob += p_hp_el[t] <= M_hp * d_hp[t]
 
         # Zóna és tömeg dinamikák (Euler diszkrét)
         if t < n_timestep - 1:
@@ -182,8 +192,8 @@ def optimize(p_pv, p_consumed, p_ut,
                     (T_mass[t] - T_zone[t]) * (1 / R_conv) + p_hp_th[t] + (T_mass[t] - T_zone[t]) * (1 / R_rad)
                     + (T_env_vector[t] - T_zone[t]) * (1 / R_ve) + Q_solar[t])
             prob += C_mass * (T_mass[k] - T_mass[t]) == dt * (
-                    (T_zone[t] - T_mass[t])* (1 / R_conv) + (T_env_vector[t] - T_mass[t]) * (1 / R_ea) + (
-                        T_zone[t] - T_mass[t]) * (1 / R_rad))
+                    (T_zone[t] - T_mass[t]) * (1 / R_conv) + (T_env_vector[t] - T_mass[t]) * (1 / R_ea) + (
+                    T_zone[t] - T_mass[t]) * (1 / R_rad))
 
             # # jobb oldal résztagjai külön változókban
             # conv_heat = (T_mass[t] - T_zone[t]) * (1 / R_conv)
@@ -348,7 +358,8 @@ def optimize(p_pv, p_consumed, p_ut,
         p_elh_out[t] = pulp.value(p_elh_out[t]) if isinstance(p_elh_out[t], pulp.LpVariable) else 0
         p_hp_th[t] = pulp.value(p_hp_th[t])
         p_hp_el[t] = pulp.value(p_hp_el[t])
-        d_hp[t] = pulp.value(d_hp[t])
+        d_hp_heat[t] = pulp.value(d_hp_heat[t])
+        d_hp_cool[t] = pulp.value(d_hp_cool[t])
         T_zone[t] = pulp.value(T_zone[t])
         T_mass[t] = pulp.value(T_mass[t])
 
@@ -364,7 +375,8 @@ def optimize(p_pv, p_consumed, p_ut,
                    p_cl_with=np.array(p_cl_with),
                    p_shared=np.array(p_shared), p_grid_out=np.array(p_grid_out),
                    p_grid_in=np.array(p_grid_in), d_cl=np.array(d_cl), p_ue=np.array(p_consumed),
-                   p_hp_th=np.array(p_hp_th), p_hp_el=np.array(p_hp_el), d_hp=np.array(d_hp), T_zone=np.array(T_zone),
+                   p_hp_th=np.array(p_hp_th), p_hp_el=np.array(p_hp_el), d_hp_heat=np.array(d_hp_heat),
+                   d_hp_cool=np.array(d_hp_cool), T_zone=np.array(T_zone),
                    T_mass=np.array(T_mass), p_pv=p_pv, p_consumed=p_consumed, p_ut=p_ut)
     return results, status, pulp.value(prob.objective), prob.numVariables(), prob.numConstraints()
 
@@ -400,126 +412,8 @@ solar_dif = na_values[:, 6]
 COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env - 5)))
 
 results, status, objective, num_vars, num_constraints = optimize(p_pv=p_pv, p_consumed=p_consumed, p_ut=p_ut,
-                                                                 size_elh=2, size_bess=10, size_hss=6, run_lp=False,
+                                                                 size_elh=2, size_bess=5, size_hss=4, run_lp=False,
                                                                  objective="environmental", T_env_vector=T_env,
                                                                  cop_hp_vector=COP,
                                                                  solar_radiation_direct=solar_dir,
-                                                                 solar_radiation_diffuse=solar_dif, gaprel=0.005)
-
-
-time_index = pd.date_range(start=df_filtered.index[0], periods=len(results["T_zone"]), freq="h")
-
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-
-# Évszakok hetének kezdőindexei az évben (óra alapú)
-weeks = {
-    "Tél": 0,                # január első hete
-    "Tavasz": 24 * 90,       # április eleje
-    "Nyár": 24 * 180,        # július eleje
-    "Ősz": 24 * 270          # október eleje
-}
-hours_in_week = 24 * 7
-
-fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(16, 12), gridspec_kw={'height_ratios': [2, 0.5]*2})
-
-# Flatten axes
-axes = axes.reshape(4, 2)
-
-for idx, (season, start_hour) in enumerate(weeks.items()):
-    end_hour = start_hour + hours_in_week
-    t_range = time_index[start_hour:end_hour]
-
-    # Felső diagram: hőmérsékletek
-    ax1 = axes[idx, 0]
-    ax1.plot(t_range, results["T_zone"][start_hour:end_hour], label="T_zone", linewidth=1.2)
-    ax1.plot(t_range, results["T_mass"][start_hour:end_hour], label="T_mass", linewidth=1.2)
-    ax1.plot(t_range, T_env[start_hour:end_hour], label="T_env", linestyle="--", linewidth=1.2)
-    ax1.set_ylabel("Hőmérséklet [°C]")
-    ax1.set_title(f"{season} - Hőmérsékletek")
-    ax1.legend(loc="upper right")
-    ax1.grid(True)
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-
-    # Alsó diagram: hőszivattyú működés
-    ax2 = axes[idx, 1]
-    hp_week = results["d_hp"][start_hour:end_hour]
-    ax2.fill_between(t_range, 0, hp_week, step="pre", color="orange", alpha=0.6, label="HP működik")
-    ax2.set_ylim(0, 1.1)
-    ax2.set_yticks([0, 1])
-    ax2.set_yticklabels(["Ki", "Be"])
-    ax2.set_ylabel("HP")
-    ax2.set_xlabel("Dátum")
-    ax2.grid(True)
-    ax2.legend(loc="upper right")
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-
-plt.tight_layout()
-plt.show()
-# 2. HP teljesítmény grafikon
-import matplotlib.pyplot as plt
-import pandas as pd
-
-hp_el = results["p_hp_el"]
-time_index = pd.date_range(start=df_filtered.index[0], periods=len(hp_el), freq="h")
-
-plt.figure(figsize=(15, 5))
-plt.plot(time_index, hp_el, label="HP villamos teljesítmény", color="tab:blue", linewidth=1.2)
-plt.xlabel("Idő")
-plt.ylabel("Teljesítmény [kW]")
-plt.title("Hőszivattyú által felvett villamos teljesítmény alakulása")
-plt.grid(True)
-plt.legend()
-plt.tight_layout()
-plt.show()
-
-
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-
-# Időindex és részterhelés kiszámítása
-time_index = pd.date_range(start=df_filtered.index[0], periods=len(results["p_hp_el"]), freq="h")
-hp_el = np.array(results["p_hp_el"])
-max_hp = hp_el.max()
-partial_load = hp_el / max_hp
-
-# Évszakok hetének kezdőindexei az évben (óra alapú)
-weeks = {
-    "Tél": 0,                # január első hete
-    "Tavasz": 24 * 90,       # április eleje
-    "Nyár": 24 * 180,        # július eleje
-    "Ősz": 24 * 270          # október eleje
-}
-hours_in_week = 24 * 7
-
-# Diagramkészítés
-fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(16, 12), gridspec_kw={'height_ratios': [2, 0.5]*2})
-axes = axes.reshape(4, 2)
-
-for idx, (season, start_hour) in enumerate(weeks.items()):
-    end_hour = start_hour + hours_in_week
-    t_range = time_index[start_hour:end_hour]
-
-    # Bal oldali subplot: hőmérsékletek
-    ax1 = axes[idx, 0]
-    ax1.plot(t_range, results["T_zone"][start_hour:end_hour], label="T_zone", linewidth=1.2)
-    ax1.plot(t_range, results["T_mass"][start_hour:end_hour], label="T_mass", linewidth=1.2)
-    ax1.plot(t_range, T_env[start_hour:end_hour], label="T_env", linestyle="--", linewidth=1.2)
-    ax1.set_ylabel("Hőmérséklet [°C]")
-    ax1.set_title(f"{season} - Hőmérsékletek")
-    ax1.legend(loc="upper right")
-    ax1.grid(True)
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-
-    # Jobb oldali subplot: részterhelés
-    ax2 = axes[idx, 1]
-    ax2.plot(t_range, partial_load[start_hour:end_hour], color="tab:red", linewidth=1.2, label="HP részterhelés")
-    ax2.set_ylim(0, 1.1)
-    ax2.set_ylabel("Részterhelés")
-    ax2.set_xlabel("Dátum")
-    ax2.grid(True)
-    ax2.legend(loc="upper right")
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-
-plt.tight_layout()
-plt.show()
+                                                                 solar_radiation_diffuse=solar_dif, gapRel=0.0005)
