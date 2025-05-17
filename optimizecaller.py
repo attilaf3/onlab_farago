@@ -234,12 +234,12 @@ def extract_results_and_show(results):
 
 
 results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
-                                                                 size_elh=2, size_bess=10, size_hss=4, run_lp=False, gapRel=0.002,
+                                                                 size_elh=2, size_bess=5, size_hss=4, run_lp=False, gapRel=0.002,
                                                                  objective="environmental")
 extract_results_and_show(results)
 
-pv_ratios = [0.25, 0.5, 0.75, 1.0, 1.25]
-bess_sizes = [0, 3, 6, 9, 12]
+pv_ratios = [0.25, 0.5, 1.0, 1.5, 2.0]
+bess_sizes = [0, 2, 4, 6, 8, 10]
 
 shape = (len(pv_ratios), len(bess_sizes))
 sc_profile = np.zeros(shape)
@@ -275,9 +275,7 @@ for i, pv_ratio in enumerate(pv_ratios):
                 bess_out[t] = discharge
                 bess_soc[t] = (bess_soc[t-1] if t > 0 else 0) - discharge
 
-        shared_profile = np.minimum(p_pv, p_consumed + p_ut_profile)
-        sc_profile[i, j] = 1 - np.sum(p_pv - shared_profile) / np.sum(p_pv)
-        # sc_profile[i, j] = np.sum(np.minimum(p_pv, shared_profile)) / np.sum(p_pv)
+        sc_profile[i, j] = 1 - np.sum(grid_in) / np.sum(p_pv)
         ss_profile[i, j] = 1 - np.sum(grid_in) / np.sum(p_consumed + p_ut_profile)
 
         # Optimalizált szcenárió
@@ -286,8 +284,8 @@ for i, pv_ratio in enumerate(pv_ratios):
                                dt=1, msg=False, objective="environmental",gapRel=0.002)
         shared = results['p_shared']
         cl_with = results['p_cl_with']
-
-        sc_profile[i, j] = 1 - np.sum(grid_in) / np.sum(p_pv)
+        p_inj = results['p_inj']
+        sc_optimal[i, j] = 1 - np.sum(p_inj) / np.sum(p_pv)
         # Hálózatból vett energia = grid_in
         p_grid_in = results['p_grid_in']
         ss_optimal[i, j] = 1 - np.sum(p_grid_in) / (np.sum(p_consumed) + np.sum(cl_with))
