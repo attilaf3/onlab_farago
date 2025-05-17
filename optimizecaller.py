@@ -234,7 +234,7 @@ def extract_results_and_show(results):
 
 
 results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
-                                                                 size_elh=2, size_bess=5, size_hss=4, run_lp=False, gapRel=0.002,
+                                                                 size_elh=2, size_bess=6, size_hss=4, run_lp=False, gapRel=0.004,
                                                                  objective="environmental")
 extract_results_and_show(results)
 
@@ -281,13 +281,13 @@ for i, pv_ratio in enumerate(pv_ratios):
         # Optimalizált szcenárió
         results, *_ = optimize(p_pv, p_consumed, p_dhw,
                                size_elh=2, size_bess=bess_size, size_hss=4, vol_hss_water=120,
-                               dt=1, msg=False, objective="environmental",gapRel=0.002)
+                               dt=1, msg=False, objective="environmental",gapRel=0.004)
+
         shared = results['p_shared']
         cl_with = results['p_cl_with']
-        p_inj = results['p_inj']
-        sc_optimal[i, j] = 1 - np.sum(p_inj) / np.sum(p_pv)
-        # Hálózatból vett energia = grid_in
         p_grid_in = results['p_grid_in']
+        sc_optimal[i, j] = 1 - np.sum(p_grid_in) / np.sum(p_pv)
+        # Hálózatból vett energia = grid_in
         ss_optimal[i, j] = 1 - np.sum(p_grid_in) / (np.sum(p_consumed) + np.sum(cl_with))
         # ss_optimal[i, j] = np.sum(results['p_shared']) / (np.sum(results['p_consumed']) + np.sum(results['p_cl_with']))
 # 1. Heatmapek
