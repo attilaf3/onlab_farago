@@ -145,8 +145,8 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
     d_grid = [pulp.LpVariable(f'Dgrid_{t}', cat=pulp.LpBinary) if not run_lp else 0 for t in time_set]
     p_grid_in = [pulp.LpVariable(f'Pgrid_in_{t}', lowBound=0) for t in time_set]
     p_grid_out = [pulp.LpVariable(f'Pgrid_out_{t}', lowBound=0) for t in time_set]
-    p_shared = [pulp.LpVariable(f'Psh_{t}', lowBound=0) for t in time_set]
-    y_shared = [pulp.LpVariable(f'Ysh_{t}', cat=pulp.LpBinary) if not run_lp else 0 for t in time_set]
+    # p_shared = [pulp.LpVariable(f'Psh_{t}', lowBound=0) for t in time_set]
+    # y_shared = [pulp.LpVariable(f'Ysh_{t}', cat=pulp.LpBinary) if not run_lp else 0 for t in time_set]
 
     # Megszorítások minden időlépésre
     for t in time_set:
@@ -156,9 +156,9 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
         prob += (p_pv[t] + p_grid_out[t] + p_bess_out[t]
                  == p_grid_in[t] + p_bess_in[t]
                  + p_consumed[t] + p_cl_with[t] + p_hp_el[t])
-        prob += p_inj[t] == p_pv[t] + p_bess_out[t]
-        prob += (p_with[t] == p_cl_with[t]
-                 + p_consumed[t] + p_bess_in[t] + p_hp_el[t])
+        prob += p_inj[t] == p_pv[t] + p_bess_out[t] - p_bess_in[t]
+        prob += (p_with[t] == p_cl_with[t] + p_hp_el[t]
+                 + p_consumed[t])
 
         # --------------------------------------------------------
         # HP-COP kapcsolat
@@ -285,16 +285,16 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
         # linearization of shared energy definition
         # constraint on the shared energy, that must be smaller than both
         # the injections and the withdrawals of the virtual users
-        prob += p_shared[t] <= p_inj[t]
-        prob += p_shared[t] <= p_with[t]
+        # prob += p_shared[t] <= p_inj[t]
+        # prob += p_shared[t] <= p_with[t]
         # constraint on the shared energy, that must also be equal to the
         # minimum between the two values.
         # when y_shared == 1: shared_power = p_inj, thanks to
         # this constraint and smaller-equal for the previous one.
         # when y_shared == 0, the other way around.
-        if not run_lp:
-            prob += p_shared[t] >= p_inj[t] - M_shared * (1 - y_shared[t])
-            prob += p_shared[t] >= p_with[t] - M_shared * y_shared[t]
+        # if not run_lp:
+        #     prob += p_shared[t] >= p_inj[t] - M_shared * (1 - y_shared[t])
+        #     prob += p_shared[t] >= p_with[t] - M_shared * y_shared[t]
 
         # Kezdeti feltételek a zóna modellhez
     prob += T_zone[0] == T_init
@@ -323,7 +323,6 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
         # az eredeti költségfüggvény kiegészítve HP fogyasztással (p_with tartalmazza p_hp_el)
         prob += pulp.lpSum([c_with * p_grid_out[t]
                             - c_inj * p_grid_in[t]
-                            - c_sh * p_shared[t]
                             for t in time_set])
     else:
         prob += pulp.lpSum([p_grid_out[t] + p_grid_in[t]
@@ -349,10 +348,8 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
         e_bess_stor[t] = pulp.value(e_bess_stor[t])
         p_hss_in[t] = pulp.value(p_hss_in[t])
         p_hss_out[t] = pulp.value(p_hss_out[t])
-        p_elh_in[t] = pulp.value(p_elh_in[t])
-        p_elh_out[t] = pulp.value(p_elh_out[t])
         t_hss[t] = pulp.value(t_hss[t])
-        p_shared[t] = pulp.value(p_shared[t])
+        # p_shared[t] = pulp.value(p_shared[t])
         p_cl_grid[t] = pulp.value(p_cl_grid[t])
         p_cl_rec[t] = pulp.value(p_cl_rec[t])
         p_cl_with[t] = pulp.value(p_cl_with[t])
@@ -362,19 +359,29 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
         # check
         d_bess[t] = pulp.value(d_bess[t])
         d_grid[t] = pulp.value(d_grid[t])
-        y_shared[t] = pulp.value(y_shared[t])
-        p_elh_in[t] = pulp.value(p_elh_in[t]) if isinstance(p_elh_in[t], pulp.LpVariable) else 0
-        p_elh_out[t] = pulp.value(p_elh_out[t]) if isinstance(p_elh_out[t], pulp.LpVariable) else 0
-        p_hp_th[t] = pulp.value(p_hp_th[t])
-        p_hp_el[t] = pulp.value(p_hp_el[t])
+        # y_shared[t] = pulp.value(y_shared[t])
         d_hp_heat[t] = pulp.value(d_hp_heat[t])
         d_hp_cool[t] = pulp.value(d_hp_cool[t])
         T_zone[t] = pulp.value(T_zone[t])
         T_mass[t] = pulp.value(T_mass[t])
+        # p_elh_in[t] = pulp.value(p_elh_in[t]) if isinstance(p_elh_in[t], pulp.LpVariable) else 0
+        p_elh_in[t] = pulp.value(p_elh_in[t])
+        w = pulp.value(p_elh_in[t])
+        p_elh_in[t] = 0 if w is None else w
+        # p_elh_out[t] = pulp.value(p_elh_out[t]) if isinstance(p_elh_out[t], pulp.LpVariable) else 0
+        p_elh_out[t] = pulp.value(p_elh_out[t])
+        v = pulp.value(p_elh_out[t])
+        p_elh_out[t] = 0 if v is None else v
+        p_hp_th[t] = pulp.value(p_hp_th[t])
+        x = pulp.value(p_hp_th[t])
+        p_hp_th[t] = 0 if x is None else x
+        p_hp_el[t] = pulp.value(p_hp_el[t])
+        y = pulp.value(p_hp_el[t])
+        p_hp_el[t] = 0 if y is None else y
 
-    p_elh_in = [0 if v is None else v for v in p_elh_in]
-    p_elh_out = [0 if v is None else v for v in p_elh_out]
     e_hss_stor = vol_hss_water * c_hss * (np.array(t_hss) - T_env)
+    p_shared = np.minimum(np.array(p_pv) + np.array(p_bess_out) - np.array(p_bess_in),
+                          np.array(p_consumed) + np.array(p_cl_with))
 
     results = dict(p_inj=np.array(p_inj), p_with=np.array(p_with),
                    p_bess_in=np.array(p_bess_in), p_bess_out=np.array(p_bess_out), e_bess_stor=np.array(e_bess_stor),
@@ -426,3 +433,12 @@ results, status, objective, num_vars, num_constraints = optimize_with_hp(p_pv=p_
                                                                  cop_hp_vector=COP,
                                                                  solar_radiation_direct=solar_dir,
                                                                  solar_radiation_diffuse=solar_dif, gapRel=0.005)
+
+
+df_out = pd.DataFrame({
+    "p_hp_el": results["p_hp_el"],
+    "p_hp_th": results["p_hp_th"],
+    "p_elh_in": results["p_elh_in"],
+    "p_elh_out": results["p_elh_out"]
+})
+df_out.to_csv("output.csv", index=False)

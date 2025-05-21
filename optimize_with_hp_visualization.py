@@ -99,7 +99,7 @@ plt.show()
 
 def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_stor, p_elh_out,
                     p_ut, p_shared, p_cl_rec, p_cl_grid, p_cl_with, e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl,
-                    p_grid_in, p_grid_out, diff_hss_out=None, diff_hss_in=None, params=None,
+                    p_grid_in, p_grid_out, diff_hss_out=None, diff_hss_in=None, params=None, p_hp_th=None, p_hp_el=None,
                     d_hp_heat=None,
                     d_hp_cool=None,
                     T_zone=None,
@@ -110,7 +110,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
     figsize = (20, 15)
     fontsize = 15
     t0s = [0, 2184, 4368, 6552]
-    dt = 168
+    dt = 72
     titles = ['Winter', 'Spring', 'Summer', 'Autumn']
     path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
     bar_kw = dict(width=0.8, )
@@ -148,8 +148,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
         bottom -= p_cl_rec[t0:tf]
         ax.bar(time, -p_grid_in[t0:tf], bottom=bottom, label=r'$P_\mathrm{grid,in}$', **bar_kw)
         bottom -= p_grid_in[t0:tf]
-        ax.bar(time, -np.array(results["p_hp_th"])[t0:tf], bottom=bottom,
-               label=r'$P_\mathrm{hp,th}$', color="salmon", **bar_kw)
+        ax.bar(time, -p_hp_el[t0:tf], bottom=bottom, label=r'$P_\mathrm{hp,el}$', **bar_kw)
 
         # Plot storage SOC
         axtw = ax.twinx()
@@ -195,13 +194,10 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
         #     ax.bar(time, diff_hss_in[t0:tf], bottom=bottom, label=r'$\Delta P_\mathrm{hss,in}$', color="cyan",
         #            **bar_kw)
         #     bottom += diff_hss_in[t0:tf]
-        if p_elh_out is not None:
-            ax.bar(time, -p_elh_out[t0:tf], bottom=bottom, label=r'$P_\mathrm{elh,out}$', **bar_kw)
-            bottom -= p_elh_out[t0:tf]
-        if p_ut is not None:
-            ax.bar(time, -p_ut[t0:tf], bottom=bottom, label=r'$P_\mathrm{ut}$', **bar_kw)
-            bottom -= p_ut[t0:tf]
-
+        ax.bar(time, -p_elh_out[t0:tf], bottom=bottom, label=r'$P_\mathrm{elh,out}$', **bar_kw)
+        bottom -= p_elh_out[t0:tf]
+        ax.bar(time, -p_ut[t0:tf], bottom=bottom, label=r'$P_\mathrm{ut}$', **bar_kw)
+        bottom -= p_ut[t0:tf]
         # # Plot storage SOC
         axtw = ax.twinx()
         axtw.plot(time, e_hss_stor[t0:tf], color='black', ls='--', label=r"$\mathrm{E_{stor,hss}}$")
@@ -331,7 +327,8 @@ def extract_results_and_show(results):
     p_bess_out = results.get('p_bess_out')
     e_bess_stor = results.get('e_bess_stor')
     p_elh_in = results.get('p_elh_in')
-    p_elh_out = results.get('p_elh_out')
+    # p_elh_out = results.get('p_elh_out')
+    p_elh_out = results.get('p_cl_grid') + results.get('p_cl_rec')  # új kiszámítás
     p_hss_in = results.get('p_hss_in')
     p_hss_out = results.get('p_hss_out')
     e_hss_stor = results.get('e_hss_stor')
@@ -348,31 +345,32 @@ def extract_results_and_show(results):
     p_pv = na_values[:, 1]
     p_ue = na_values[:, 0]
     p_ut = na_values[:, 2]
-    display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_stor, p_elh_out, p_ut, p_shared, p_cl_rec,
-                    p_cl_grid, p_cl_with, e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl, p_grid_in, p_grid_out, p_elh_in,
+    display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_stor,
+                    p_elh_out, p_ut, p_shared, p_cl_rec, p_cl_grid, p_cl_with,
+                    e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl,
+                    p_grid_in, p_grid_out, p_elh_in,
+                    p_hp_th=results.get("p_hp_th"),
+                    p_hp_el=results.get("p_hp_el"),
                     d_hp_heat=results.get("d_hp_heat"),
                     d_hp_cool=results.get("d_hp_cool"),
                     T_zone=results.get("T_zone"),
                     T_mass=results.get("T_mass"),
-                    T_env=T_env
-                    )
-
+                    T_env=T_env)
 
 extract_results_and_show(results)
 
-
-# Napi működési idő külön fűtésre és hűtésre
-s_hp_heat = pd.Series(d_hp_heat, index=time_index).resample("D").sum()
-s_hp_cool = pd.Series(d_hp_cool, index=time_index).resample("D").sum()
-
-plt.figure(figsize=(14, 5))
-plt.bar(s_hp_heat.index, s_hp_heat.values, label="Fűtés (óra)", color="red")
-plt.bar(s_hp_cool.index, s_hp_cool.values, bottom=s_hp_heat.values, label="Hűtés (óra)", color="blue")
-plt.axhline(20, color="gray", linestyle="--", label="Max. napi működés")
-plt.ylabel("HP működés [óra/nap]")
-plt.xlabel("Dátum")
-plt.title("Hőszivattyú napi működési ideje bontva (fűtés-hűtés)")
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-plt.show()
+    # # Napi működési idő külön fűtésre és hűtésre
+    # s_hp_heat = pd.Series(d_hp_heat, index=time_index).resample("D").sum()
+    # s_hp_cool = pd.Series(d_hp_cool, index=time_index).resample("D").sum()
+    #
+    # plt.figure(figsize=(14, 5))
+    # plt.bar(s_hp_heat.index, s_hp_heat.values, label="Fűtés (óra)", color="red")
+    # plt.bar(s_hp_cool.index, s_hp_cool.values, bottom=s_hp_heat.values, label="Hűtés (óra)", color="blue")
+    # plt.axhline(20, color="gray", linestyle="--", label="Max. napi működés")
+    # plt.ylabel("HP működés [óra/nap]")
+    # plt.xlabel("Dátum")
+    # plt.title("Hőszivattyú napi működési ideje bontva (fűtés-hűtés)")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
+    # plt.show()
