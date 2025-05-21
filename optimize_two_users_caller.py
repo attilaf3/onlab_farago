@@ -35,7 +35,7 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
     figsize = (24, 15)  # Nagyobb méret a 3x3-as elrendezéshez
     fontsize = 15
     t0s = [0, 2184, 4368, 6552]  # Kezdő időt lépések (tél, tavasz, nyár, ősz)
-    dt = 72  # Egy hét (168 óra)
+    dt = 168  # Egy hét (168 óra)
     titles = ['Winter', 'Spring', 'Summer', 'Autumn']
     path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
     bar_kw = dict(width=0.8)  # Keskenyebb sávok
@@ -192,7 +192,7 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
 
             # Vezérlés overlay
             ax_ctrl = ax_th.twinx()
-            ax_ctrl.plot(time, results['d_cl'][t0:tf], '.', color='lightgrey')
+            ax_ctrl.plot(time, results['d_cl'][t0:tf], '.', ls='-', color='lightgrey', label=r"$\mathrm{control\ signal\ (on/off)}$")
             ax_ctrl.axis('off')
 
             # Tengely és feliratok
@@ -310,8 +310,8 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
 # Optimalizálás futtatása
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(
     p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed,
-    size_elh=np.array([2, 2.5]), size_bess=40, size_hss=np.array([4, 5]), run_lp=False, objective="environmental",
-    gapRel=0.002
+    size_elh=np.array([2, 2.5]), size_bess=20, size_hss=np.array([4, 5]), run_lp=False, objective="environmental",
+    gapRel=0.01
 )
 
 # Eredmények megjelenítése
@@ -321,13 +321,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-def calculate_ssi_sci(p_shared, p_with, p_pv, p_consumed):
-    total_shared = np.sum(p_shared)
-    total_with = np.sum(p_with)
-    total_pv = np.sum(p_pv)
-    total_consumed = np.sum(p_consumed)
-    ssi = total_shared / total_consumed if total_consumed > 0 else 0
-    sci = total_shared / total_pv if total_pv > 0 else 0
+def calculate_ssi_sci(p_shared, p_with, p_inj):
+    ssi = np.sum(p_shared) / np.sum(p_with) if np.sum(p_with) > 0 else 0
+    sci = np.sum(p_shared) / np.sum(p_inj) if np.sum(p_inj) > 0 else 0
     return ssi, sci
 
 
@@ -381,5 +377,68 @@ def generate_ssi_sci_heatmaps(results_dict, pv_ratios, bess_sizes, base_pv, base
 
     plt.tight_layout()
     plt.show()
+
+# Bemeneti paraméterek
+pv_ratios = [0.25, 0.5, 1.0, 1.5, 2.0]
+bess_sizes = [0, 10, 20, 30, 40]
+
+# Alap PV és fogyasztási profil 2 felhasználóra
+base_pv = na_p_pv.copy()
+base_consumed = na_p_consumed.copy()
+
+# Eredmények gyűjtése
+results_dict = {"optimal": {}, "profile": {}}
+
+for ratio in pv_ratios:
+    for bess in bess_sizes:
+        # Méretezett bemenetek
+        p_pv_scaled = base_pv * ratio
+
+        # PROFILE SCENARIO (egyszerű kézi logika minden userre külön)
+        soc = np.zeros((len(p_pv_scaled),))  # közös BESS
+        bess_capacity = bess
+        p_with = np.sum(base_consumed, axis=1)
+        p_inj = np.sum(p_pv_scaled, axis=1)
+        bess_in = np.zeros_like(p_inj)
+        bess_out = np.zeros_like(p_inj)
+
+        for t in range(len(p_inj)):
+            demand = p_with[t]
+            surplus = p_inj[t] - demand
+            if surplus >= 0:
+                charge = min(surplus, bess_capacity - soc[t-1] if t > 0 else bess_capacity)
+                soc[t] = soc[t-1] + charge if t > 0 else charge
+                bess_in[t] = charge
+                p_inj[t] = surplus - charge
+            else:
+                discharge = min(-surplus, soc[t-1] if t > 0 else 0)
+                bess_out[t] = discharge
+                soc[t] = soc[t-1] - discharge if t > 0 else 0
+                p_inj[t] += discharge
+
+        shared = np.minimum(p_inj, p_with)
+
+        # Eredmények mentése
+        results_dict["profile"][(bess, ratio)] = {
+            "p_shared": shared,
+            "p_with": p_with,
+            "p_inj": p_inj
+        }
+
+        # OPTIMAL CONTROL SCENARIO
+        results, *_ = optimize_two_users(
+            p_pv=p_pv_scaled, p_consumed=base_consumed, p_ut=na_p_ut,
+            size_elh=np.array([2, 2.5]), size_bess=bess, gapRel=0.01,
+            size_hss=np.array([4, 5]), run_lp=False, objective="environmental"
+        )
+
+        results_dict["optimal"][(bess, ratio)] = {
+            "p_shared": results["p_shared"],
+            "p_with": results["p_with"],
+            "p_inj": results["p_inj"]
+        }
+
+# Generáljunk diagramokat
+generate_ssi_sci_heatmaps(results_dict, pv_ratios, bess_sizes, base_pv.sum(axis=1), base_consumed.sum(axis=1))
 
 
