@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt, patheffects as pe
-from optimize_two_users import optimize_two_users, p_shared
+from optimize_two_users import optimize_two_users
+
 
 # Adatok betöltése
 df = pd.read_csv('input_tobb_haztartas.csv', sep=';', index_col=0, parse_dates=True)
@@ -287,6 +288,7 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
     d_cl = ensure_numeric(results.get('d_cl'), var_name="d_cl")
     p_inj = ensure_numeric(results.get('p_inj'), var_name="p_inj")
     p_with = ensure_numeric(results.get('p_with'), var_name="p_with")
+    p_shared = ensure_numeric(results.get('p_shared'), var_name="p_shared")
     # Hőszivattyús változók (csak ha hss_flag=True)
     p_hss_in = results.get('p_hss_in')
     p_hss_out = results.get('p_hss_out')
@@ -319,9 +321,9 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
         'p_hss_out': p_hss_out,
         'e_hss_stor': e_hss_stor,
         't_hss': t_hss,
-        'p_shared': p_shared,
         'p_inj': p_inj,
-        'p_with': p_with
+        'p_with': p_with,
+        'p_shared': p_shared
     }
 
     display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag)
@@ -330,7 +332,7 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
 # Optimalizálás futtatása
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(
     p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed,
-    size_elh=np.array([2, 2.5]), size_bess=20, size_hss=np.array([4, 5]), run_lp=False, objective="environmental",
+    size_elh=np.array([2, 2.5]), size_bess=40, size_hss=np.array([4, 5]), run_lp=False, objective="environmental",
     gapRel=0.002
 )
 

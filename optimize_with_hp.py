@@ -5,7 +5,7 @@ from pulp import LpStatusOptimal
 import pandas as pd
 
 
-def optimize(p_pv, p_consumed, p_ut,
+def optimize_with_hp(p_pv, p_consumed, p_ut,
              T_env_vector, cop_hp_vector,
              dt=1,
              size_elh=None, size_bess=None, size_hss=None,
@@ -300,6 +300,15 @@ def optimize(p_pv, p_consumed, p_ut,
     prob += T_zone[0] == T_init
     prob += T_mass[0] == T_init
 
+    # Minimum 2 órás működési ciklus hőszivattyúnál
+    for t in range(1, n_timestep - 1):
+        prob += d_hp_heat[t + 1] >= d_hp_heat[t] - d_hp_heat[t - 1]
+        prob += d_hp_cool[t + 1] >= d_hp_cool[t] - d_hp_cool[t - 1]
+
+    # Napi maximum 20 óra hőszivattyú működés (összesen fűtés + hűtés)
+    for j in range(0, n_timestep, n_timesteps_in_a_day):
+        prob += pulp.lpSum([d_hp_heat[t] + d_hp_cool[t] for t in range(j, j + n_timesteps_in_a_day)]) <= 20
+
     # --- eredeti napi CL megszorítások ---
     if cl_flag:
         for j in range(0, n_timestep, n_timesteps_in_a_day):
@@ -325,7 +334,7 @@ def optimize(p_pv, p_consumed, p_ut,
         prob.writeLP("debug_hp.lp")
 
     # Solve
-    status = prob.solve(pulp.GUROBI_CMD(msg=True))
+    status = prob.solve(pulp.GUROBI_CMD(msg=True, gapRel=gapRel, timeLimit=timeLimit))
     print("Solver status:", pulp.LpStatus[status])
     if status != LpStatusOptimal:
         print("Optimalizáció sikertelen. Ellenőrizd a bemeneteket, COP értékeket, kapacitásokat stb.")
@@ -411,9 +420,9 @@ solar_dir = na_values[:, 5]
 solar_dif = na_values[:, 6]
 COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env - 5)))
 
-results, status, objective, num_vars, num_constraints = optimize(p_pv=p_pv, p_consumed=p_consumed, p_ut=p_ut,
+results, status, objective, num_vars, num_constraints = optimize_with_hp(p_pv=p_pv, p_consumed=p_consumed, p_ut=p_ut,
                                                                  size_elh=2, size_bess=5, size_hss=4, run_lp=False,
                                                                  objective="environmental", T_env_vector=T_env,
                                                                  cop_hp_vector=COP,
                                                                  solar_radiation_direct=solar_dir,
-                                                                 solar_radiation_diffuse=solar_dif, gapRel=0.0005)
+                                                                 solar_radiation_diffuse=solar_dif, gapRel=0.005)

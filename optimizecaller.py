@@ -1,7 +1,7 @@
 import pandas as pd
 from matplotlib import pyplot as plt, patheffects as pe
 import numpy as np
-from optimize import optimize
+from test2 import optimize
 import seaborn as sns
 
 # Ctrl+Shift+Alt+L: code cleanup: hosszú sorok tördelése+importok optimalizálása
@@ -21,7 +21,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
     figsize = (20, 15)
     fontsize = 15
     t0s = [0, 2184, 4368, 6552]
-    dt = 168
+    dt = 72
     titles = ['Winter', 'Spring', 'Summer', 'Autumn']
     path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
     bar_kw = dict(width=0.8, )
@@ -32,12 +32,10 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
         tf = t0 + dt
         time = np.arange(t0, tf)
 
-        # Make figure
-        fig, axes = plt.subplots(nrows=3, ncols=2, figsize=figsize, sharex=True,
-                                 gridspec_kw=dict(width_ratios=[0.8, 0.2]))
-
         # Electric node of the condominium
-        ax = axes[0, 0]
+        fig, axes = plt.subplots(ncols=2, figsize=(16, 6), gridspec_kw=dict(width_ratios=[0.8, 0.2]))
+        ax = axes[0]
+        legend_ax = axes[1]
         # ax.set_xlim(t0, tf - 1)
         # Plot "positive" half
         bottom = np.zeros_like(time, dtype=float)
@@ -61,27 +59,35 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
 
         # Plot storage SOC
         axtw = ax.twinx()
-        axtw.plot(time, e_bess_stor[t0:tf], color='lightgrey', ls='--')
+        axtw.plot(time, e_bess_stor[t0:tf], color='black', ls='--', label=r"$\mathrm{E_{stor,bess}}$")
 
         # Adjust and show
         ax.set_xlabel("Time (h)", fontsize=fontsize)
         ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("Electric hub", fontsize=fontsize)
+        ax.set_title(f"{titles[i]} – Electric hub", fontsize=fontsize)
         ax.tick_params(labelsize=fontsize)
         ax.grid()
 
         axtw.set_ylabel("Stored energy (kWh)")
-        axtw.spines['right'].set_color('lightgrey')
-        axtw.tick_params(axis='y', colors='lightgrey')
-        axtw.yaxis.label.set_color('lightgrey')
+        axtw.spines['right'].set_color('black')
+        axtw.tick_params(axis='y', colors='black')
+        axtw.yaxis.label.set_color('black')
 
         # Legend
-        handles, labels = ax.get_legend_handles_labels()
-        axes[0, 1].legend(handles, labels, fontsize=fontsize, loc='center')
-        axes[0, 1].axis('off')
+        handles1, labels1 = ax.get_legend_handles_labels()
+        handles2, labels2 = axtw.get_legend_handles_labels()
+        handles3, labels3 = axtd.get_legend_handles_labels() if 'axtd' in locals() else ([], [])  # ha van vezérlés
+
+        legend_ax.legend(handles1 + handles2 + handles3, labels1 + labels2 + labels3, loc='center', fontsize=fontsize,
+                         ncol=2)
+        legend_ax.axis('off')
+        plt.tight_layout()
+        plt.show()
 
         # Thermal node
-        ax = axes[1, 0]
+        fig, axes = plt.subplots(ncols=2, figsize=(16, 6), gridspec_kw=dict(width_ratios=[0.8, 0.2]))
+        ax = axes[0]
+        legend_ax = axes[1]
         # ax.set_xlim(t0, tf - 1)
         # # Plot "positive" half
         bottom = np.zeros_like(time, dtype=float)
@@ -134,20 +140,25 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
         # # Adjust and show
         ax.set_xlabel("Time (h)", fontsize=fontsize)
         ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("Thermal node", fontsize=fontsize)
+        ax.set_title(f"{titles[i]} – Thermal node", fontsize=fontsize)
         ax.tick_params(labelsize=fontsize)
         ax.grid()
 
         # # Legend
-        handles, labels = ax.get_legend_handles_labels()
-        axtd_handles, axtd_labels = axtd.get_legend_handles_labels()
-        axtw_handles, axtw_labels = axtw.get_legend_handles_labels()
-        axes[1, 1].legend(handles + axtd_handles + axtw_handles, labels + axtd_labels + axtw_labels, fontsize=fontsize,
-                          loc='center', ncol=2)
-        axes[1, 1].axis('off')
+        handles1, labels1 = ax.get_legend_handles_labels()
+        handles2, labels2 = axtw.get_legend_handles_labels() if 'axtw' in locals() else ([], [])
+        handles3, labels3 = axtd.get_legend_handles_labels() if 'axtd' in locals() else ([], [])
+
+        legend_ax.legend(handles1 + handles2 + handles3, labels1 + labels2 + labels3, loc='center', fontsize=fontsize,
+                         ncol=2)
+        legend_ax.axis('off')
+        plt.tight_layout()
+        plt.show()
 
         # CSC
-        ax = axes[2, 0]
+        fig, axes = plt.subplots(ncols=2, figsize=(16, 6), gridspec_kw=dict(width_ratios=[0.8, 0.2]))
+        ax = axes[0]
+        legend_ax = axes[1]
         # ax.set_xlim(t0, tf - 1)
         # Interpolate for graphical purposes
         t_plot = np.linspace(t0, tf, 1000)
@@ -182,27 +193,20 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
         # Adjust and show
         ax.set_xlabel("Time (h)", fontsize=fontsize)
         ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("CSC", fontsize=fontsize)
+        ax.set_title(f"{titles[i]} – CSC", fontsize=fontsize)
         ax.tick_params(labelsize=fontsize)
         ax.grid()
 
         # Legend
-        handles, labels = ax.get_legend_handles_labels()
-        axes[2, 1].legend(handles, labels, fontsize=fontsize, loc='center')
-        axes[2, 1].axis('off')
+        handles1, labels1 = ax.get_legend_handles_labels()
+        handles2, labels2 = axtw.get_legend_handles_labels() if 'axtw' in locals() else ([], [])
+        handles3, labels3 = axtd.get_legend_handles_labels() if 'axtd' in locals() else ([], [])
 
-        # Adjust and show
-        plt.subplots_adjust(top=0.55)  # Adjust the position of the overall title
-        fig.suptitle(titles[i], fontsize=fontsize)
-        fig.tight_layout()
-        # fig.subplots_adjust(left=0.063, bottom=0.095, right=0.905,top=0.88, wspace=0.413, hspace=0.564)
-        # plt.savefig('oneuser_'+titles[i].lower(), dpi=300, bbox_inches='tight')
-        # output_dir = config.get("path", "figures_output")
-        # makedirs(output_dir, exist_ok=True)
-        # plt.savefig(
-        #     join(output_dir, f"{titles[i]}_{config.get('simulation', 'experiment')}{filename_post(params)}.png"))
+        legend_ax.legend(handles1 + handles2 + handles3, labels1 + labels2 + labels3, loc='center', fontsize=fontsize,
+                         ncol=2)
+        legend_ax.axis('off')
+        plt.tight_layout()
         plt.show()
-
 
 def extract_results_and_show(results):
     # Get results
@@ -212,7 +216,8 @@ def extract_results_and_show(results):
     p_bess_out = results.get('p_bess_out')
     e_bess_stor = results.get('e_bess_stor')
     p_elh_in = results.get('p_elh_in')
-    p_elh_out = results.get('p_elh_out')
+    # p_elh_out = results.get('p_elh_out')  # ezt kikommentezheted
+    p_elh_out = results.get('p_cl_grid') + results.get('p_cl_rec')  # új kiszámítás
     p_hss_in = results.get('p_hss_in')
     p_hss_out = results.get('p_hss_out')
     e_hss_stor = results.get('e_hss_stor')
@@ -234,7 +239,7 @@ def extract_results_and_show(results):
 
 
 results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
-                                                                 size_elh=2, size_bess=6, size_hss=4, run_lp=False, gapRel=0.004,
+                                                                 size_elh=2, size_bess=8, size_hss=4, run_lp=False, gapRel=0.01,
                                                                  objective="environmental")
 extract_results_and_show(results)
 
@@ -275,21 +280,23 @@ for i, pv_ratio in enumerate(pv_ratios):
                 bess_out[t] = discharge
                 bess_soc[t] = (bess_soc[t-1] if t > 0 else 0) - discharge
 
-        sc_profile[i, j] = 1 - np.sum(grid_in) / np.sum(p_pv)
-        ss_profile[i, j] = 1 - np.sum(grid_in) / np.sum(p_consumed + p_ut_profile)
+        p_inj_profile = p_pv + bess_out
+        p_with_profile = p_consumed + p_ut_profile
+        shared_profile = np.minimum(p_inj_profile, p_with_profile)
 
+        sc_profile[i, j] = np.sum(shared_profile) / np.sum(p_inj_profile)
+        ss_profile[i, j] = np.sum(shared_profile) / np.sum(p_with_profile)
         # Optimalizált szcenárió
         results, *_ = optimize(p_pv, p_consumed, p_dhw,
                                size_elh=2, size_bess=bess_size, size_hss=4, vol_hss_water=120,
-                               dt=1, msg=False, objective="environmental",gapRel=0.004)
+                               dt=1, msg=False, objective="environmental",gapRel=0.01)
 
-        shared = results['p_shared']
-        cl_with = results['p_cl_with']
-        p_grid_in = results['p_grid_in']
-        sc_optimal[i, j] = 1 - np.sum(p_grid_in) / np.sum(p_pv)
+        sc_optimal[i, j] = np.sum(results['p_shared']) / np.sum(results['p_inj'])
         # Hálózatból vett energia = grid_in
-        ss_optimal[i, j] = 1 - np.sum(p_grid_in) / (np.sum(p_consumed) + np.sum(cl_with))
-        # ss_optimal[i, j] = np.sum(results['p_shared']) / (np.sum(results['p_consumed']) + np.sum(results['p_cl_with']))
+        # p_grid_in = results['p_grid_in']
+        # ss_optimal[i, j] = 1 - np.sum(p_grid_in) / (np.sum(p_consumed) + np.sum(cl_with));
+        ss_optimal[i, j] = np.sum(results['p_shared']) / np.sum(results['p_with'])
+
 # 1. Heatmapek
 def plot_heatmap(data, title):
     plt.figure(figsize=(7, 5))
@@ -306,54 +313,74 @@ plot_heatmap(ss_profile, "SS - Profile")
 plot_heatmap(sc_optimal, "SC - Optimal Control")
 plot_heatmap(ss_optimal, "SS - Optimal Control")
 
-# 2. Pareto-diagram
-def plot_pareto(sc, ss, label):
-    pts = [(sc[i, j], ss[i, j]) for i in range(len(pv_ratios)) for j in range(len(bess_sizes))]
-    x, y = zip(*pts)
-    plt.scatter(x, y, label=label)
+import matplotlib.patches as mpatches
 
-plt.figure(figsize=(7, 5))
-plot_pareto(sc_profile, ss_profile, "Profile")
-plot_pareto(sc_optimal, ss_optimal, "Optimal Control")
-plt.xlabel("SC (Self-Consumption)")
-plt.ylabel("SS (Self-Sufficiency)")
-plt.title("Pareto Diagram: SC vs. SS")
-plt.legend()
+# Élénkebb színpaletta
+colors = sns.color_palette("tab10", len(pv_ratios))
+
+# SCI vs. SSI diagram: PV ratio → szín, BESS size → méret, origó [0.2, 0.2]
+plt.figure(figsize=(10, 6))
+
+for i, pv in enumerate(pv_ratios):
+    for j, bess in enumerate(bess_sizes):
+        x = ss_profile[i, j]
+        y = sc_profile[i, j]
+        size = 40 + bess * 10
+        plt.scatter(x, y, s=size, c=[colors[i]], marker='o', alpha=0.9,
+                    edgecolors='black', linewidths=0.6, label=f"PV={pv}" if j == 0 else "")
+
+plt.xlabel("SSI (Self-Sufficiency Index)")
+plt.ylabel("SCI (Self-Consumption Index)")
+plt.title("SCI vs. SSI (Profile Scenario)\nPV arány színekkel, BESS méret pontmérettel")
+plt.xlim(0.2, 1.0)
+plt.ylim(0.2, 1.0)
+
+# PV színekhez legenda
+patches_pv = [mpatches.Patch(color=colors[i], label=f"PV={pv_ratios[i]}") for i in range(len(pv_ratios))]
+legend_pv = plt.legend(handles=patches_pv, title="PV ratio", loc="lower right")
+
+# BESS mérethez (üres kör) legenda
+scatter_handles = [
+    plt.scatter([], [], s=40 + b * 10, edgecolors='black', facecolors='none', marker='o', label=f'{b} kWh')
+    for b in bess_sizes
+]
+legend_bess = plt.legend(handles=scatter_handles, title="BESS size", loc="lower center",
+                         bbox_to_anchor=(0.5, -0.25), ncol=len(bess_sizes))
+
+plt.gca().add_artist(legend_pv)
 plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-from scipy.optimize import curve_fit
+# Optimalizált SCI és SSI alapján: PV arány színnel, BESS méret pontmérettel
+plt.figure(figsize=(10, 6))
+colors = sns.color_palette("tab10", len(pv_ratios))
 
+for i, pv in enumerate(pv_ratios):
+    for j, bess in enumerate(bess_sizes):
+        x = ss_optimal[i, j]
+        y = sc_optimal[i, j]
+        size = 40 + bess * 10
+        plt.scatter(x, y, s=size, c=[colors[i]], marker='o', alpha=0.9,
+                    edgecolors='black', linewidths=0.6, label=f"PV={pv}" if j == 0 else "")
 
-# 3. Pareto-görbe SCI és SSI között
-def pareto_fit(x, a, b, c):
-    return a / (1 + np.exp(-b * (x - c)))
+plt.xlabel("SSI (Self-Sufficiency Index)")
+plt.ylabel("SCI (Self-Consumption Index)")
+plt.title("SCI vs. SSI (Optimal Control Scenario)\nPV arány színekkel, BESS méret pontmérettel")
 
+# PV színekhez legenda
+patches_pv = [mpatches.Patch(color=colors[i], label=f"PV={pv_ratios[i]}") for i in range(len(pv_ratios))]
+legend_pv = plt.legend(handles=patches_pv, title="PV ratio", loc="lower right")
 
-def plot_pareto_with_fit(sc, ss, label):
-    pts = [(sc[i, j], ss[i, j]) for i in range(len(pv_ratios)) for j in range(len(bess_sizes))]
-    x, y = zip(*pts)
-    x = np.array(x)
-    y = np.array(y)
+# BESS mérethez legenda
+scatter_handles = [
+    plt.scatter([], [], s=40 + b * 10, edgecolors='black', facecolors='none', marker='o', label=f'{b} kWh')
+    for b in bess_sizes
+]
+legend_bess = plt.legend(handles=scatter_handles, title="BESS size", loc="lower center",
+                         bbox_to_anchor=(0.5, -0.25), ncol=len(bess_sizes))
 
-    # Görbeillesztés
-    popt, _ = curve_fit(pareto_fit, x, y, maxfev=5000)
-
-    # Illesztett görbe kirajzolása
-    x_fit = np.linspace(min(x), max(x), 200)
-    y_fit = pareto_fit(x_fit, *popt)
-
-    plt.plot(x_fit, y_fit, label=f"{label} - Fit", linestyle="--")
-    plt.scatter(x, y, label=f"{label} - Data")
-
-plt.figure(figsize=(7, 5))
-plot_pareto_with_fit(sc_profile, ss_profile, "Profile")
-plot_pareto_with_fit(sc_optimal, ss_optimal, "Optimal Control")
-plt.xlabel("SCI (Self-Consumption Index)")
-plt.ylabel("SSI (Self-Sufficiency Index)")
-plt.title("Pareto-görbe SCI és SSI között")
-plt.legend()
+plt.gca().add_artist(legend_pv)
 plt.grid(True)
 plt.tight_layout()
 plt.show()

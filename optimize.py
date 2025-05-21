@@ -138,11 +138,6 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
     # withdrawn electricity
     p_grid_out = [pulp.LpVariable(f'Pgrid_out_{t}', lowBound=0) for t in time_set]
 
-    # shared energy
-    p_shared = [pulp.LpVariable(f'Psh_{t}', lowBound=0) for t in time_set]
-    # auxiliary binary variables to evaluate shared energy
-    y_shared = [pulp.LpVariable(f'Ysh_{t}', cat=pulp.LpBinary) if not run_lp else 0 for t in time_set]
-
     # Add the constraints to the problem
     # For each time step
     for t in time_set:
@@ -154,8 +149,8 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
         prob += p_pv[t] + p_grid_out[t] + p_bess_out[t] == p_grid_in[t] + p_bess_in[t] + p_consumed[t] + p_cl_with[t]
         # energy exchange between the grid and the hubs
         # prob += p_inj[t] - p_with[t] == p_grid_in[t] - p_grid_out[t]
-        prob += p_inj[t] == p_pv[t] + p_bess_out[t]
-        prob += p_with[t] == p_cl_with[t] + p_consumed[t] + p_bess_in[t]
+        prob += p_inj[t] == p_pv[t] + p_bess_out[t] - p_bess_in[t]
+        prob += p_with[t] == p_cl_with[t] + p_consumed[t]
 
         # battery energy storage system
         if bess_flag:
@@ -225,16 +220,11 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
         # linearization of shared energy definition
         # constraint on the shared energy, that must be smaller than both
         # the injections and the withdrawals of the virtual users
-        prob += p_shared[t] <= p_inj[t]
-        prob += p_shared[t] <= p_with[t]
         # constraint on the shared energy, that must also be equal to the
         # minimum between the two values.
         # when y_shared == 1: shared_power = p_inj, thanks to
         # this constraint and smaller-equal for the previous one.
         # when y_shared == 0, the other way around.
-        if not run_lp:
-            prob += p_shared[t] >= p_inj[t] - M_shared * (1 - y_shared[t])
-            prob += p_shared[t] >= p_with[t] - M_shared * y_shared[t]
 
     if cl_flag:
         for j in range(0, n_timestep, n_timesteps_in_a_day):
@@ -247,10 +237,10 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
     # add the objective of the optimisation
     if objective == 'economic':
         if hss_flag:
-            prob += pulp.lpSum([c_with * p_grid_out[t] - c_inj * p_grid_in[t] - c_sh * p_shared[t] for t in time_set])
+            prob += pulp.lpSum([c_with * p_grid_out[t] - c_inj * p_grid_in[t] for t in time_set])
         else:
-            prob += pulp.lpSum([c_with * (p_grid_out[t] - p_cl_with[t]) + c_cl * p_cl_with[t] - c_inj * p_grid_in[
-                t] - c_sh * p_shared[t] for t in time_set])
+            prob += pulp.lpSum([c_with * p_grid_out[t] - c_inj * p_grid_in[t] for t in time_set])
+
     else:
         prob += pulp.lpSum([p_grid_out[t] + p_grid_in[t] for t in time_set])
 
@@ -280,7 +270,6 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
         p_elh_in[t] = pulp.value(p_elh_in[t])
         p_elh_out[t] = pulp.value(p_elh_out[t])
         t_hss[t] = pulp.value(t_hss[t])
-        p_shared[t] = pulp.value(p_shared[t])
         p_cl_grid[t] = pulp.value(p_cl_grid[t])
         p_cl_rec[t] = pulp.value(p_cl_rec[t])
         p_cl_with[t] = pulp.value(p_cl_with[t])
@@ -290,13 +279,21 @@ def optimize(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_h
         # check
         d_bess[t] = pulp.value(d_bess[t])
         d_grid[t] = pulp.value(d_grid[t])
-        y_shared[t] = pulp.value(y_shared[t])
-        p_elh_in[t] = pulp.value(p_elh_in[t]) if isinstance(p_elh_in[t], pulp.LpVariable) else 0
-        p_elh_out[t] = pulp.value(p_elh_out[t]) if isinstance(p_elh_out[t], pulp.LpVariable) else 0
+        # p_elh_in[t] = pulp.value(p_elh_in[t]) if isinstance(p_elh_in[t], pulp.LpVariable) else 0
+        p_elh_in[t] = pulp.value(p_elh_in[t])
+        w = pulp.value(p_elh_in[t])
+        p_elh_in[t] = 0 if w is None else w
+        # p_elh_out[t] = pulp.value(p_elh_out[t]) if isinstance(p_elh_out[t], pulp.LpVariable) else 0
+        p_elh_out[t] = pulp.value(p_elh_out[t])
+        v = pulp.value(p_elh_out[t])
+        p_elh_out[t] = 0 if v is None else v
 
-    p_elh_in = [0 if v is None else v for v in p_elh_in]
-    p_elh_out = [0 if v is None else v for v in p_elh_out]
+
+    # p_elh_in = [0 if v is None else v for v in p_elh_in]
+    # p_elh_out = [0 if v is None else v for v in p_elh_out]
     e_hss_stor = vol_hss_water * c_hss * (np.array(t_hss) - T_env) / dt
+    p_shared = np.minimum(np.array(p_pv) + np.array(p_bess_out) - np.array(p_bess_in),
+                          np.array(p_consumed) + np.array(p_cl_with))
 
     # Store in results
     results = dict(p_inj=np.array(p_inj), p_with=np.array(p_with),

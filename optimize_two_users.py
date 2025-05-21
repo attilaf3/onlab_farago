@@ -8,19 +8,10 @@ from pulp import LpStatusOptimal, LpStatus
 def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=None, size_hss=None, vol_hss_water=None,
                        run_lp=False, **kwargs):
 
-    # # Bemenetek ellenőrzése
-    # print("Input shapes inside function:")
-    # print("p_pv shape:", p_pv.shape)
-    # print("p_consumed shape:", p_consumed.shape)
-    # print("p_ut shape:", p_ut.shape)
-    n_timestep = p_pv.shape[0]
-
     # n_timestep definiálása
     n_timestep = p_pv.shape[0]
     assert n_timestep == p_consumed.shape[0] == p_ut.shape[0], "Input arrays must have the same length."
-    # print("n_timestep:", n_timestep)
     time_set = range(n_timestep)
-    # print("time_set length:", len(time_set))
 
     # Parameters
     eta_bess_in = kwargs.get('eta_bess_in', 0.98)
@@ -66,7 +57,8 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
     p_cl_with = np.array([[pulp.LpVariable(f'Pcl_with_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
     p_cl_grid = np.array([[pulp.LpVariable(f'Pcl_grid_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
     p_cl_rec = np.array([[pulp.LpVariable(f'Pcl_rec_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
-    d_cl = [pulp.LpVariable(f'Dcl_{t}', cat=pulp.LpBinary) if not run_lp else 0 for t in time_set]
+    d_cl = [[pulp.LpVariable(f'Dcl_{t}_{u}', cat=pulp.LpBinary) if not run_lp else 0 for u in user_ids] for t in
+            time_set]
 
     p_elh_in = np.array([[pulp.LpVariable(f'Pelh_in_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
     p_elh_out = np.array([[pulp.LpVariable(f'Pelh_out_{t}_{u}', lowBound=0) for u in user_ids] for t in time_set])
@@ -93,8 +85,6 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
     p_grid_out = [pulp.LpVariable(f'Pgrid_out_{t}', lowBound=0) for t in time_set]
     p_inj = [pulp.LpVariable(f'Prec_inj_{t}', lowBound=0) for t in time_set]
     p_with = [pulp.LpVariable(f'Prec_with_{t}', lowBound=0) for t in time_set]
-    p_shared = [pulp.LpVariable(f'Psh_{t}', lowBound=0) for t in time_set]
-    y_shared = [pulp.LpVariable(f'Ysh_{t}', cat=pulp.LpBinary) for t in time_set]
 
     for t in time_set:
         k = (t + 1) % len(time_set)
@@ -148,23 +138,20 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
         prob += p_grid_in[t] <= d_grid[t] * M_grid_in
         prob += p_grid_out[t] <= (1 - d_grid[t]) * M_grid_out
 
-        prob += p_shared[t] <= p_inj[t]
-        prob += p_shared[t] <= p_with[t]
-        prob += p_shared[t] >= p_inj[t] - M_shared * (1 - y_shared[t])
-        prob += p_shared[t] >= p_with[t] - M_shared * y_shared[t]
-
-    if t != time_set[0] and t != time_set[-1]:
-        prob += d_cl[t + 1] >= d_cl[t] - d_cl[t - 1]
+    for u in user_ids:
+        if t != time_set[0] and t != time_set[-1]:
+            prob += d_cl[t + 1][u] >= d_cl[t][u] - d_cl[t - 1][u]
     n_timesteps_in_a_day = 24
     # d_cl időzítési megszorítás
     y_middle_day = [0] * 10 + [1] * 6 + [0] * 8
     for j in range(0, n_timestep - n_timesteps_in_a_day + 1, n_timesteps_in_a_day):
-        prob += pulp.lpSum([d_cl[t] for t in range(j, j + n_timesteps_in_a_day)]) <= 12
-        prob += pulp.lpSum([d_cl[t] * y_middle_day[t - j] for t in range(j, j + n_timesteps_in_a_day)]) >= 4
+        for u in user_ids:
+            prob += pulp.lpSum([d_cl[t][u] for t in range(j, j + n_timesteps_in_a_day)]) <= 12
+            prob += pulp.lpSum([d_cl[t][u] * y_middle_day[t - j] for t in range(j, j + n_timesteps_in_a_day)]) >= 4
 
     # Objective
     if objective == "economic":
-        prob += pulp.lpSum([c_with * p_grid_out[t] - c_inj * p_grid_in[t] - c_sh * p_shared[t] for t in time_set])
+        prob += pulp.lpSum([c_with * p_grid_out[t] - c_inj * p_grid_in[t]  for t in time_set])
     else:
         prob += pulp.lpSum([p_grid_out[t] + p_grid_in[t] for t in time_set])
 
@@ -187,9 +174,6 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
         p_grid_out[t] = pulp.value(p_grid_out[t])
         d_bess[t] = pulp.value(d_bess[t])
         d_grid[t] = pulp.value(d_grid[t])
-        y_shared[t] = pulp.value(y_shared[t])
-        p_shared[t] = pulp.value(p_shared[t])
-        d_cl[t] = pulp.value(d_cl[t])
         p_inj[t] = pulp.value(p_inj[t])
         p_with[t] = pulp.value(p_with[t])
 
@@ -207,6 +191,9 @@ def optimize_two_users(p_pv, p_consumed, p_ut, dt=1, size_elh=None, size_bess=No
             p_cl_rec[t, u] = pulp.value(p_cl_rec[t, u])
             p_cl_with[t, u] = pulp.value(p_cl_with[t, u])
             p_selfcons[t, u] = p_pv[t, u] - pulp.value(p_inj_user[t, u])
+            d_cl[t][u] = pulp.value(d_cl[t][u])
+
+    p_shared = np.minimum(np.array(p_inj), np.array(p_with))
 
     # Store in results
     results = dict(p_inj_user=np.array(p_inj_user), p_with_user=np.array(p_with_user),
@@ -229,40 +216,9 @@ na_p_consumed = df_filtered[["consumer1", "consumer2"]].to_numpy()
 na_p_pv = df_filtered[["pv1", "pv2"]].to_numpy()
 na_p_ut = df_filtered[["thermal_user1", "thermal_user2"]].to_numpy()
 
-# # Bemenetek ellenőrzése
-# print("na_p_consumed shape:", na_p_consumed.shape)
-# print("na_p_pv shape:", na_p_pv.shape)
-# print("na_p_ut shape:", na_p_ut.shape)
-
 # Run optimization
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(p_pv=na_p_pv, p_ut=na_p_ut,
                                                                                      p_consumed=na_p_consumed,
-                                                                                   size_elh=np.array([2, 2.5]),
-                                                                                     size_bess=20)
-# # Kimeneti méretek
-# print("Final results shapes:")
-# print("p_inj_user shape:", results['p_inj_user'].shape)
-# print("p_with_user shape:", results['p_with_user'].shape)
-# print("p_cl_with shape:", results['p_cl_with'].shape)
-# print("p_grid_in shape:", results['p_grid_in'].shape)
-# print("p_bess_in shape:", results['p_bess_in'].shape)
-# print("Objective value:", objective)
-# print("Number of variables:", num_vars)
-# print("Number of constraints:", num_constraints)
-is_shared_used = int(np.any(results["p_shared"] > 0))
-print("Megosztott energia használt:", is_shared_used)
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-p_shared = results["p_shared"]
-
-plt.figure(figsize=(10, 4))
-plt.plot(p_shared, label="Megosztott energia (p_shared)", linewidth=1.5)
-plt.title("Megosztott energia időbeli alakulása")
-plt.xlabel("Időlépés")
-plt.ylabel("Teljesítmény [kW]")
-plt.grid(True)
-plt.legend()
-plt.tight_layout()
-plt.show()
+                                                                                     size_elh=np.array([2, 2.5]),
+                                                                                     size_hss=np.array([4, 5]),
+                                                                                     size_bess=20, gapRel=0.002, run_lp=False)
