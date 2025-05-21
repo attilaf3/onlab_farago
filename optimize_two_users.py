@@ -222,3 +222,25 @@ results, status, objective, user_ids, num_vars, num_constraints = optimize_two_u
                                                                                      size_elh=np.array([2, 2.5]),
                                                                                      size_hss=np.array([4, 5]),
                                                                                      size_bess=20, gapRel=0.002, run_lp=False)
+
+# CSV export az összes változóra – ha futtatod a fájlt közvetlenül
+if __name__ == "__main__":
+    index = df_filtered.index
+    output = {}
+
+    for key, val in results.items():
+        if isinstance(val, np.ndarray):
+            arr = np.array(val)
+            if arr.ndim == 1:
+                output[key] = arr
+            elif arr.ndim == 2 and arr.shape[1] == 2:  # pl. két user
+                output[f"{key}_0"] = arr[:, 0]
+                output[f"{key}_1"] = arr[:, 1]
+            else:
+                print(f"Skipped (not saving): {key}, shape={arr.shape}")
+        else:
+            print(f"Skipped (non-array): {key}")
+
+    df_out = pd.DataFrame(output, index=index)
+    df_out.to_csv("results_two_users_full.csv")
+    print("Eredmények mentve: results_two_users_full.csv")

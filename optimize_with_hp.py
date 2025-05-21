@@ -433,12 +433,3 @@ results, status, objective, num_vars, num_constraints = optimize_with_hp(p_pv=p_
                                                                  cop_hp_vector=COP,
                                                                  solar_radiation_direct=solar_dir,
                                                                  solar_radiation_diffuse=solar_dif, gapRel=0.005)
-
-
-df_out = pd.DataFrame({
-    "p_hp_el": results["p_hp_el"],
-    "p_hp_th": results["p_hp_th"],
-    "p_elh_in": results["p_elh_in"],
-    "p_elh_out": results["p_elh_out"]
-})
-df_out.to_csv("output.csv", index=False)

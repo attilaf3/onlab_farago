@@ -35,10 +35,10 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
     figsize = (24, 15)  # Nagyobb méret a 3x3-as elrendezéshez
     fontsize = 15
     t0s = [0, 2184, 4368, 6552]  # Kezdő időt lépések (tél, tavasz, nyár, ősz)
-    dt = 168  # Egy hét (168 óra)
+    dt = 72  # Egy hét (168 óra)
     titles = ['Winter', 'Spring', 'Summer', 'Autumn']
     path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
-    bar_kw = dict(width=0.4)  # Keskenyebb sávok
+    bar_kw = dict(width=0.8)  # Keskenyebb sávok
     plot_kw = dict(lw=3, path_effects=path_effect(3))
     area_kw = dict(alpha=0.6)
 
@@ -46,229 +46,206 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
         tf = t0 + dt
         time = np.arange(t0, tf)
 
-        # 3x3-as subplotok
-        fig, axes = plt.subplots(nrows=3, ncols=3, figsize=figsize, sharex=True,
-                                 gridspec_kw=dict(width_ratios=[0.4, 0.4, 0.2]))
+        # Ábra
+        fig, (ax, ax_legend) = plt.subplots(1, 2, figsize=(18, 8), gridspec_kw={'width_ratios': [0.85, 0.15]})
+        bottom_pos = np.zeros_like(time, dtype=float)
+        bottom_neg = np.zeros_like(time, dtype=float)
 
-        # 1. felhasználó (0. oszlop)
-        # Elektromos csomópont
-        ax = axes[0, 0]
-        bottom = np.zeros_like(time, dtype=float)
-        ax.bar(time, p_pv[t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{pv}$', **bar_kw)
-        bottom += p_pv[t0:tf, 0]
-        ax.bar(time, results['p_bess_out'][t0:tf], bottom=bottom, label=r'$P_\mathrm{bess,out}$', **bar_kw)
-        bottom += results['p_bess_out'][t0:tf]
-        ax.bar(time, results['p_grid_out'][t0:tf], bottom=bottom, label=r'$P_\mathrm{grid,out}$', **bar_kw)
+        # Felfelé: termelés és kisütés
+        ax.bar(time, na_p_pv[t0:tf, 0], bottom=bottom_pos, label=r'$P_\mathrm{pv,u0}$', color='lightgreen', hatch='///', **bar_kw)
+        bottom_pos += na_p_pv[t0:tf, 0]
+        ax.bar(time, na_p_pv[t0:tf, 1], bottom=bottom_pos, label=r'$P_\mathrm{pv,u1}$', color='green', hatch='\\\\', **bar_kw)
+        bottom_pos += na_p_pv[t0:tf, 1]
+        ax.bar(time, results['p_bess_out'][t0:tf], bottom=bottom_pos, label=r'$P_\mathrm{bess,out}$', color='orange', **bar_kw)
+        bottom_pos += results['p_bess_out'][t0:tf]
+        ax.bar(time, results['p_grid_out'][t0:tf], bottom=bottom_pos, label=r'$P_\mathrm{grid,out}$', color='blue', **bar_kw)
 
-        bottom = np.zeros_like(time, dtype=float)
-        ax.bar(time, -p_consumed[t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{ue}$', **bar_kw)
-        bottom -= p_consumed[t0:tf, 0]
-        ax.bar(time, -results['p_bess_in'][t0:tf], bottom=bottom, label=r'$P_\mathrm{bess,in}$', **bar_kw)
-        bottom -= results['p_bess_in'][t0:tf]
-        ax.bar(time, -results['p_cl_grid'][t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{cl,grid}$', **bar_kw)
-        bottom -= results['p_cl_grid'][t0:tf, 0]
-        ax.bar(time, -results['p_cl_rec'][t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{cl,rec}$', **bar_kw)
-        bottom -= results['p_cl_rec'][t0:tf, 0]
-        ax.bar(time, -results['p_grid_in'][t0:tf], bottom=bottom, label=r'$P_\mathrm{grid,in}$', **bar_kw)
+        # Lefelé: igény és vételezés
+        ax.bar(time, -na_p_consumed[t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{ue,u0}$', color='lightcoral', hatch='///',
+               **bar_kw)
+        bottom_neg -= na_p_consumed[t0:tf, 0]
+        ax.bar(time, -na_p_consumed[t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{ue,u1}$', color='red', hatch='\\\\', **bar_kw)
+        bottom_neg -= na_p_consumed[t0:tf, 1]
+        ax.bar(time, -results['p_cl_rec'][t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{cl,rec,u0}$', color='lightgrey',
+               hatch='///', **bar_kw)
+        bottom_neg -= results['p_cl_rec'][t0:tf, 0].astype(float)
+        ax.bar(time, -results['p_cl_rec'][t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{cl,rec,u1}$', color='grey', hatch='\\\\',
+               **bar_kw)
+        bottom_neg -= results['p_cl_rec'][t0:tf, 1].astype(float)
+        ax.bar(time, -results['p_cl_grid'][t0:tf, 0].astype(float), bottom=bottom_neg, label=r'$P_\mathrm{cl,grid,u0}$',
+               color='mediumorchid', hatch='///', **bar_kw)
+        bottom_neg -= results['p_cl_grid'][t0:tf, 0].astype(float)
+        ax.bar(time, -results['p_cl_grid'][t0:tf, 1].astype(float), bottom=bottom_neg, label=r'$P_\mathrm{cl,grid,u1}$',
+               color='indigo', hatch='\\\\', **bar_kw)
+        bottom_neg -= results['p_cl_grid'][t0:tf, 1].astype(float)
+        ax.bar(time, -results['p_bess_in'][t0:tf], bottom=bottom_neg, label=r'$P_\mathrm{bess,in}$', color='purple', **bar_kw)
+        bottom_neg -= results['p_bess_in'][t0:tf].astype(float)
+        ax.bar(time, -results['p_grid_in'][t0:tf], bottom=bottom_neg, label=r'$P_\mathrm{grid,in}$', color='navy', **bar_kw)
 
-        # Akkumulátor SOC
-        axtw = ax.twinx()
-        axtw.plot(time, results['e_bess_stor'][t0:tf], color='lightgrey', ls='--')
-        axtw.set_ylabel("Stored energy (kWh)")
-        axtw.spines['right'].set_color('lightgrey')
-        axtw.tick_params(axis='y', colors='lightgrey')
-        axtw.yaxis.label.set_color('lightgrey')
+        # BESS SOC
+        ax2 = ax.twinx()
+        ax2.plot(time, results['e_bess_stor'][t0:tf], color='black', ls='--', label=r'$E_\mathrm{stor, bess}$')
+        ax2.set_ylabel("Stored energy (kWh)", color='black')
+        ax2.tick_params(axis='y', colors='black')
+        ax2.spines['right'].set_color('black')
 
-        ax.set_xlabel("Time (h)", fontsize=fontsize)
-        ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("Electric hub (User 1)", fontsize=fontsize)
-        ax.tick_params(labelsize=fontsize)
-        ax.grid()
-
-        # Termikus csomópont
-        ax = axes[1, 0]
-        bottom = np.zeros_like(time, dtype=float)
-        ax.bar(time, results['p_cl_grid'][t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{cl,grid}$', **bar_kw)
-        bottom += results['p_cl_grid'][t0:tf, 0]
-        ax.bar(time, results['p_cl_rec'][t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{cl,rec}$', **bar_kw)
-        bottom += results['p_cl_rec'][t0:tf, 0]
-        if hss_flag:
-            ax.bar(time, results['p_hss_out'][t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{hss,out}$', **bar_kw)
-            bottom += results['p_hss_out'][t0:tf, 0]
-
-        bottom = np.zeros_like(time, dtype=float)
-        ax.bar(time, -results['p_elh_out'][t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{elh,out}$', **bar_kw)
-        bottom -= results['p_elh_out'][t0:tf, 0]
-        ax.bar(time, -p_ut[t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{ut}$', **bar_kw)
-        bottom -= p_ut[t0:tf, 0]
-        if hss_flag:
-            ax.bar(time, -results['p_hss_in'][t0:tf, 0], bottom=bottom, label=r'$P_\mathrm{hss,in}$', **bar_kw)
-            bottom -= results['p_hss_in'][t0:tf, 0]
-
-        # Termikus tároló SOC
-        if hss_flag:
-            axtw = ax.twinx()
-            axtw.plot(time, results['e_hss_stor'][t0:tf, 0], color='black', ls='--', label=r"$\mathrm{E_{stor,hss}}$")
-            axtw.set_ylabel("Stored energy (kWh)")
-            axtw.spines['right'].set_color('black')
-            axtw.tick_params(axis='y', colors='black')
-            axtw.yaxis.label.set_color('black')
-            axtw.legend().set_visible(False)
-
-        # Vezérlőjel
-        axtd = ax.twinx()
-        axtd.plot(time, results['d_cl'][t0:tf], '.', ls='-', color='lightgrey',
-                  label=r"$\mathrm{control\ signal\ (on/off)}$")
-        axtd.spines["top"].set_visible(False)
-        axtd.spines["right"].set_visible(False)
-        axtd.spines["left"].set_visible(False)
-        axtd.spines["bottom"].set_visible(False)
-        axtd.tick_params(axis="both", which='both', length=0, labelcolor="none")
-        axtd.legend().set_visible(False)
-
-        ax.set_xlabel("Time (h)", fontsize=fontsize)
-        ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("Thermal node (User 1)", fontsize=fontsize)
-        ax.tick_params(labelsize=fontsize)
-        ax.grid()
-
-        # CSC (User 1)
-        ax = axes[2, 0]
-        time = np.arange(t0, tf)
-        p_inj = results['p_inj'][t0:tf]
-        p_with = results['p_with'][t0:tf]
-        p_shared = results['p_shared'][t0:tf]
-
-        ax.plot(time, p_inj, label=r'$P_\mathrm{inj}$', color='tab:red')
-        ax.plot(time, p_with, label=r'$P_\mathrm{with}$', color='tab:blue')
-        ax.plot(time, p_shared, label=r'$P_\mathrm{shared}$', color='tab:green')
-
-        ax.fill_between(time, p_shared, p_with, where=p_with > p_shared, label='E_from_grid', color='tab:blue',
-                        alpha=0.3)
-        ax.fill_between(time, p_shared, p_inj, where=p_inj > p_shared, label='E_to_grid', color='tab:red', alpha=0.3)
-        ax.fill_between(time, 0, p_shared, where=p_shared > 0, label='E_shared', color='tab:green', alpha=0.6)
-
-        ax.set_title("Community CSC – teljes rendszer energiacseréi")
-        ax.set_xlabel("Időlépés")
-        ax.set_ylabel("Teljesítmény [kW]")
-        ax.legend()
+        # Beállítások
+        ax.set_xlabel("Time (h)")
+        ax.set_ylabel("Power (kW)")
+        ax.set_title(f"{titles[i]} – Electric Hub", fontsize=14)
+        handles, labels = ax.get_legend_handles_labels()
+        ax_legend.legend(handles, labels, loc='center', fontsize=12)
+        ax_legend.axis('off')
         ax.grid(True)
+        plt.tight_layout()
+        plt.show()
 
-        # 2. felhasználó (1. oszlop)
-        # Elektromos csomópont
-        ax = axes[0, 1]
-        bottom = np.zeros_like(time, dtype=float)
-        ax.bar(time, p_pv[t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{pv}$', **bar_kw)
-        bottom += p_pv[t0:tf, 1]
-        ax.bar(time, results['p_bess_out'][t0:tf], bottom=bottom, label=r'$P_\mathrm{bess,out}$', **bar_kw)
-        bottom += results['p_bess_out'][t0:tf]
-        ax.bar(time, results['p_grid_out'][t0:tf], bottom=bottom, label=r'$P_\mathrm{grid,out}$', **bar_kw)
+        # # Új ábra: Thermal node külön figure-ben, 3 subplottal (User1, User2, Legend)
+        # fig_th, axes_th = plt.subplots(1, 3, figsize=(18, 6), gridspec_kw={'width_ratios': [0.4, 0.4, 0.2]},
+        #                                sharex=True)
+        # fig_th.suptitle(f"{titles[i]} – Thermal Node", fontsize=16)
+        #
+        # handles_all = []
+        #
+        # for u in range(2):
+        #     ax_th = axes_th[u]
+        #     bottom = np.zeros_like(time, dtype=float)
+        #
+        #     # Felfelé: CL grid, CL rec, HSS out
+        #     ax_th.bar(time, results['p_cl_grid'][t0:tf, u], bottom=bottom, label=r'$P_\mathrm{cl,grid}$', **bar_kw)
+        #     bottom += results['p_cl_grid'][t0:tf, u]
+        #     ax_th.bar(time, results['p_cl_rec'][t0:tf, u], bottom=bottom, label=r'$P_\mathrm{cl,rec}$', **bar_kw)
+        #     bottom += results['p_cl_rec'][t0:tf, u]
+        #     if hss_flag:
+        #         ax_th.bar(time, results['p_hss_out'][t0:tf, u], bottom=bottom, label=r'$P_\mathrm{hss,out}$', **bar_kw)
+        #         bottom += results['p_hss_out'][t0:tf, u]
+        #
+        #     # Lefelé: ELH out, P_ut, HSS in
+        #     bottom = np.zeros_like(time, dtype=float)
+        #     ax_th.bar(time, -results['p_elh_out'][t0:tf, u], bottom=bottom, label=r'$P_\mathrm{elh,out}$', **bar_kw)
+        #     bottom -= results['p_elh_out'][t0:tf, u]
+        #     ax_th.bar(time, -p_ut[t0:tf, u], bottom=bottom, label=r'$P_\mathrm{ut}$', **bar_kw)
+        #     bottom -= p_ut[t0:tf, u]
+        #     if hss_flag:
+        #         ax_th.bar(time, -results['p_hss_in'][t0:tf, u], bottom=bottom, label=r'$P_\mathrm{hss,in}$', **bar_kw)
+        #         bottom -= results['p_hss_in'][t0:tf, u]
+        #
+        #     # Tároló SOC
+        #     if hss_flag:
+        #         ax_tw = ax_th.twinx()
+        #         ax_tw.plot(time, results['e_hss_stor'][t0:tf, u], color='black', ls='--', label=r'$E_\mathrm{stor, hss}$')
+        #         ax_tw.set_ylabel("Stored energy (kWh)", color='black')
+        #         ax_tw.tick_params(axis='y', colors='black')
+        #         ax_tw.spines['right'].set_color('black')
+        #
+        #     # Vezérlőjel
+        #     ax_td = ax_th.twinx()
+        #     ax_td.plot(time, results['d_cl'][t0:tf], '.', ls='-', color='lightgrey')
+        #     ax_td.axis('off')
+        #
+        #     ax_th.set_title(f"User {u + 1}")
+        #     ax_th.set_xlabel("Time (h)")
+        #     ax_th.set_ylabel("Power (kW)")
+        #     ax_th.grid(True)
+        #
+        #     if u == 0:
+        #         handles_all, labels_all = ax_th.get_legend_handles_labels()
+        #
+        # # Jelmagyarázat a jobb oldali subplotba
+        # axes_th[2].legend(handles_all, labels_all, loc='center', fontsize=12)
+        # axes_th[2].axis('off')
+        #
+        # plt.tight_layout()
+        # plt.show()
 
-        bottom = np.zeros_like(time, dtype=float)
-        ax.bar(time, -p_consumed[t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{ue}$', **bar_kw)
-        bottom -= p_consumed[t0:tf, 1]
-        ax.bar(time, -results['p_bess_in'][t0:tf], bottom=bottom, label=r'$P_\mathrm{bess,in}$', **bar_kw)
-        bottom -= results['p_bess_in'][t0:tf]
-        ax.bar(time, -results['p_cl_grid'][t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{cl,grid}$', **bar_kw)
-        bottom -= results['p_cl_grid'][t0:tf, 1]
-        ax.bar(time, -results['p_cl_rec'][t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{cl,rec}$', **bar_kw)
-        bottom -= results['p_cl_rec'][t0:tf, 1]
-        ax.bar(time, -results['p_grid_in'][t0:tf], bottom=bottom, label=r'$P_\mathrm{grid,in}$', **bar_kw)
+        # Két külön thermal diagram userenként
+        for u in range(2):
+            fig_th, (ax_th, legend_th) = plt.subplots(1, 2, figsize=(18, 8), gridspec_kw={'width_ratios': [0.85, 0.15]})
+            fig_th.suptitle(f"{titles[i]} – Thermal Node – User {u}", fontsize=16)
 
-        # Akkumulátor SOC
-        axtw = ax.twinx()
-        axtw.plot(time, results['e_bess_stor'][t0:tf], color='lightgrey', ls='--')
-        axtw.set_ylabel("Stored energy (kWh)")
-        axtw.spines['right'].set_color('lightgrey')
-        axtw.tick_params(axis='y', colors='lightgrey')
-        axtw.yaxis.label.set_color('lightgrey')
+            bottom_pos = np.zeros_like(time, dtype=float)
+            bottom_neg = np.zeros_like(time, dtype=float)
 
+            # Felső oldal: termelés (cl_grid, cl_rec, hss_out)
+            ax_th.bar(time, results['p_cl_grid'][t0:tf, u], bottom=bottom_pos,
+                      label=r'$P_\mathrm{cl,grid}$', color='mediumorchid', **bar_kw)
+            bottom_pos += results['p_cl_grid'][t0:tf, u]
+            ax_th.bar(time, results['p_cl_rec'][t0:tf, u], bottom=bottom_pos,
+                      label=r'$P_\mathrm{cl,rec}$', color='grey', **bar_kw)
+            bottom_pos += results['p_cl_rec'][t0:tf, u]
+            ax_th.bar(time, results['p_hss_out'][t0:tf, u], bottom=bottom_pos,
+                      label=r'$P_\mathrm{hss,out}$', color='orange', **bar_kw)
+
+            # Alsó oldal: igények (elh_out, ut)
+            ax_th.bar(time, -results['p_elh_out'][t0:tf, u], bottom=bottom_neg,
+                      label=r'$P_\mathrm{elh,out}$', color='teal', **bar_kw)
+            bottom_neg -= results['p_elh_out'][t0:tf, u]
+            ax_th.bar(time, -p_ut[t0:tf, u], bottom=bottom_neg,
+                      label=r'$P_\mathrm{ut}$', color='firebrick', **bar_kw)
+
+            # SOC overlay
+            ax_soc = ax_th.twinx()
+            ax_soc.plot(time, results['e_hss_stor'][t0:tf, u], color='black', ls='--', label=r'$E_\mathrm{stor,hss}$')
+            ax_soc.set_ylabel("Stored energy (kWh)", color='black')
+            ax_soc.tick_params(axis='y', colors='black')
+            ax_soc.spines['right'].set_color('black')
+
+            # Vezérlés overlay
+            ax_ctrl = ax_th.twinx()
+            ax_ctrl.plot(time, results['d_cl'][t0:tf], '.', color='lightgrey')
+            ax_ctrl.axis('off')
+
+            # Tengely és feliratok
+            ax_th.set_xlabel("Time (h)")
+            ax_th.set_ylabel("Power (kW)")
+            ax_th.set_title(f"Thermal balance – User {u}")
+            ax_th.grid(True)
+
+            # Jelmagyarázat
+            handles, labels = ax_th.get_legend_handles_labels()
+            legend_th.legend(handles, labels, loc='center', fontsize=12)
+            legend_th.axis('off')
+
+            plt.tight_layout()
+            plt.show()
+
+        # CSC
+        fig, (ax, legend_ax) = plt.subplots(ncols=2, figsize=(18, 8), gridspec_kw=dict(width_ratios=[0.8, 0.2]))
+        fig.suptitle(f"{titles[i]} – CSC", fontsize=fontsize)
+
+        # Interpoláció a sima grafikonhoz
+        t_plot = np.linspace(t0, tf, 1000)
+        f_plot = lambda x: np.interp(t_plot, time, x)
+        p_inj_plot = f_plot(results['p_inj'][t0:tf])
+        p_with_plot = f_plot(results['p_with'][t0:tf])
+        p_shared_plot = np.minimum(p_inj_plot, p_with_plot)
+
+        # Görbék
+        ax.plot(t_plot, p_inj_plot, label=r'$P_\mathrm{inj}$', color='tab:red', **plot_kw)
+        ax.plot(t_plot, p_with_plot, label=r'$P_\mathrm{with}$', color='tab:blue', **plot_kw)
+        ax.plot(t_plot, p_shared_plot, label=r'$P_\mathrm{shared}$', color='tab:green', **plot_kw)
+
+        # Kitöltött területek
+        ax.fill_between(t_plot, p_shared_plot, p_with_plot, where=p_with_plot > p_shared_plot,
+                        label=r'E$_\mathrm{\leftarrow grid}$', color='tab:blue', **area_kw)
+        ax.fill_between(t_plot, p_shared_plot, p_inj_plot, where=p_inj_plot > p_shared_plot,
+                        label=r'E$_\mathrm{\rightarrow grid}$', color='tab:red', **area_kw)
+        ax.fill_between(t_plot, 0, p_shared_plot, where=p_shared_plot > 0,
+                        label=r'E$_\mathrm{shared}$', color='tab:green', alpha=0.3)
+
+        # Beállítások
         ax.set_xlabel("Time (h)", fontsize=fontsize)
         ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("Electric hub (User 2)", fontsize=fontsize)
+        ax.set_title("Community exchange", fontsize=fontsize)
         ax.tick_params(labelsize=fontsize)
         ax.grid()
 
-        # Termikus csomópont
-        ax = axes[1, 1]
-        bottom = np.zeros_like(time, dtype=float)
-        ax.bar(time, results['p_cl_grid'][t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{cl,grid}$', **bar_kw)
-        bottom += results['p_cl_grid'][t0:tf, 1]
-        ax.bar(time, results['p_cl_rec'][t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{cl,rec}$', **bar_kw)
-        bottom += results['p_cl_rec'][t0:tf, 1]
-        if hss_flag:
-            ax.bar(time, results['p_hss_out'][t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{hss,out}$', **bar_kw)
-            bottom += results['p_hss_out'][t0:tf, 1]
+        # Jelmagyarázat
+        handles1, labels1 = ax.get_legend_handles_labels()
+        legend_ax.legend(handles1, labels1, loc='center', fontsize=fontsize, ncol=2)
+        legend_ax.axis('off')
 
-        bottom = np.zeros_like(time, dtype=float)
-        ax.bar(time, -results['p_elh_out'][t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{elh,out}$', **bar_kw)
-        bottom -= results['p_elh_out'][t0:tf, 1]
-        ax.bar(time, -p_ut[t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{ut}$', **bar_kw)
-        bottom -= p_ut[t0:tf, 1]
-        if hss_flag:
-            ax.bar(time, -results['p_hss_in'][t0:tf, 1], bottom=bottom, label=r'$P_\mathrm{hss,in}$', **bar_kw)
-            bottom -= results['p_hss_in'][t0:tf, 1]
-
-        # Termikus tároló SOC
-        if hss_flag:
-            axtw = ax.twinx()
-            axtw.plot(time, results['e_hss_stor'][t0:tf, 1], color='black', ls='--', label=r"$\mathrm{E_{stor,hss}}$")
-            axtw.set_ylabel("Stored energy (kWh)")
-            axtw.spines['right'].set_color('black')
-            axtw.tick_params(axis='y', colors='black')
-            axtw.yaxis.label.set_color('black')
-            axtw.legend().set_visible(False)
-
-        # Vezérlőjel
-        axtd = ax.twinx()
-        axtd.plot(time, results['d_cl'][t0:tf], '.', ls='-', color='lightgrey',
-                  label=r"$\mathrm{control\ signal\ (on/off)}$")
-        axtd.spines["top"].set_visible(False)
-        axtd.spines["right"].set_visible(False)
-        axtd.spines["left"].set_visible(False)
-        axtd.spines["bottom"].set_visible(False)
-        axtd.tick_params(axis="both", which='both', length=0, labelcolor="none")
-        axtd.legend().set_visible(False)
-
-        ax.set_xlabel("Time (h)", fontsize=fontsize)
-        ax.set_ylabel("Power (kW)", fontsize=fontsize)
-        ax.set_title("Thermal node (User 2)", fontsize=fontsize)
-        ax.tick_params(labelsize=fontsize)
-        ax.grid()
-
-        ax = axes[2, 1]
-        eff = np.divide(results['p_shared'][t0:tf], results['p_inj'][t0:tf],
-                        out=np.zeros_like(results['p_shared'][t0:tf]), where=results['p_inj'][t0:tf] > 0)
-        ax.plot(time, eff, color='purple', lw=2)
-        ax.set_title("Megosztás hatékonysága ($P_{shared}/P_{inj}$)")
-        ax.set_ylim(0, 1.05)
-        ax.set_ylabel("Arány")
-        ax.set_xlabel("Időlépés")
-        ax.grid(True)
-
-        # Jelmagyarázatok (3. oszlop)
-        handles, labels = axes[0, 0].get_legend_handles_labels()
-        axes[0, 2].legend(handles, labels, fontsize=fontsize, loc='center')
-        axes[0, 2].axis('off')
-
-        handles, labels = axes[1, 0].get_legend_handles_labels()
-        axtd_handles, axtd_labels = axtd.get_legend_handles_labels()
-        if hss_flag:
-            axtw_handles, axtw_labels = axtw.get_legend_handles_labels()
-            axes[1, 2].legend(handles + axtd_handles + axtw_handles, labels + axtd_labels + axtw_labels,
-                              fontsize=fontsize, loc='center', ncol=2)
-        else:
-            axes[1, 2].legend(handles + axtd_handles, labels + axtd_labels, fontsize=fontsize, loc='center', ncol=2)
-        axes[1, 2].axis('off')
-
-        handles, labels = axes[2, 0].get_legend_handles_labels()
-        axes[2, 2].legend(handles, labels, fontsize=fontsize, loc='center')
-        axes[2, 2].axis('off')
-
-        # Ábrázolás beállítása
-        plt.subplots_adjust(top=0.55)
-        fig.suptitle(titles[i], fontsize=fontsize)
-        fig.tight_layout()
+        plt.tight_layout()
         plt.show()
 
 
@@ -282,7 +259,8 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
     p_bess_in = ensure_numeric(results.get('p_bess_in'), var_name="p_bess_in")
     p_bess_out = ensure_numeric(results.get('p_bess_out'), var_name="p_bess_out")
     e_bess_stor = ensure_numeric(results.get('e_bess_stor'), var_name="e_bess_stor")
-    p_elh_out = ensure_numeric(results.get('p_elh_out'), var_name="p_elh_out")
+    # p_elh_out = ensure_numeric(results.get('p_elh_out'), var_name="p_elh_out")
+    p_elh_out = ensure_numeric(results.get('p_cl_grid') + results.get('p_cl_rec'), var_name="p_elh_out")
     p_cl_grid = ensure_numeric(results.get('p_cl_grid'), var_name="p_cl_grid")
     p_cl_rec = ensure_numeric(results.get('p_cl_rec'), var_name="p_cl_rec")
     d_cl = ensure_numeric(results.get('d_cl'), var_name="d_cl")
