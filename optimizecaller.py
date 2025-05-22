@@ -21,7 +21,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
     figsize = (20, 15)
     fontsize = 15
     t0s = [0, 2184, 4368, 6552]
-    dt = 72
+    dt = 168
     titles = ['Winter', 'Spring', 'Summer', 'Autumn']
     path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
     bar_kw = dict(width=0.8, )
@@ -207,6 +207,41 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
         legend_ax.axis('off')
         plt.tight_layout()
         plt.show()
+
+        # --- ÚJ DIAGRAM: PV vs Consumption (színezett, p_ue alapján) ---
+        fig, axes = plt.subplots(ncols=2, figsize=(16, 6), gridspec_kw=dict(width_ratios=[0.8, 0.2]))
+        ax = axes[0]
+        legend_ax = axes[1]
+
+        t_plot = np.linspace(t0, tf, 1000)
+        f_plot = lambda x: np.interp(t_plot, time, x)
+        p_pv_plot = f_plot(p_pv[t0:tf])
+        p_ue_plot = f_plot(p_ue[t0:tf])  # új: p_with helyett p_ue
+        p_ut_plot = f_plot(p_ut[t0:tf])
+
+        # Vonalak
+        ax.plot(t_plot, p_pv_plot, color='red', label=r'$P_\mathrm{pv}$', lw=2.5)
+        ax.plot(t_plot, p_ue_plot + p_ut_plot, color='blue', label=r'$P_\mathrm{consumed}$', lw=2.5)
+
+        # Színezés
+        ax.fill_between(t_plot, 0, p_pv_plot, color='tab:red', alpha=0.2)
+        ax.fill_between(t_plot, 0, p_ue_plot + p_ut_plot, color='tab:blue', alpha=0.2)
+
+        # Tengelyek és cím
+        ax.set_xlabel("Time (h)", fontsize=fontsize)
+        ax.set_ylabel("Power (kW)", fontsize=fontsize)
+        ax.set_title(f"{titles[i]} – PV vs Consumption", fontsize=fontsize)
+        ax.tick_params(labelsize=fontsize)
+        ax.grid()
+
+        # Legend
+        handles1, labels1 = ax.get_legend_handles_labels()
+        legend_ax.legend(handles1, labels1, loc='center', fontsize=fontsize)
+        legend_ax.axis('off')
+
+        plt.tight_layout()
+        plt.show()
+
 
 def extract_results_and_show(results):
     # Get results
