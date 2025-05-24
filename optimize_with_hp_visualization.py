@@ -36,13 +36,13 @@ solar_dif = na_values[:, 6]
 COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env - 5)))
 
 results, status, objective, num_vars, num_constraints = optimize_with_hp(p_pv=p_pv, p_consumed=p_consumed, p_ut=p_ut,
-                                                                         size_elh=2, size_bess=5, size_hss=4,
+                                                                         size_elh=2, size_bess=8, size_hss=4,
                                                                          run_lp=False,
                                                                          objective="environmental", T_env_vector=T_env,
                                                                          cop_hp_vector=COP,
                                                                          solar_radiation_direct=solar_dir,
                                                                          solar_radiation_diffuse=solar_dif,
-                                                                         gapRel=0.005)
+                                                                         gapRel=0.01)
 
 # Index generálása
 n_hours = len(results["T_zone"])
@@ -109,7 +109,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
     # One week in each season
     figsize = (20, 15)
     fontsize = 15
-    t0s = [0, 2184, 4368, 6552]
+    t0s = [0+168+48, 2184, 4368 + 168*2, 6552]
     dt = 72
     titles = ['Winter', 'Spring', 'Summer', 'Autumn']
     path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
@@ -357,7 +357,7 @@ def extract_results_and_show(results):
                     T_mass=results.get("T_mass"),
                     T_env=T_env)
 
-extract_results_and_show(results)
+#extract_results_and_show(results)
 
     # # Napi működési idő külön fűtésre és hűtésre
     # s_hp_heat = pd.Series(d_hp_heat, index=time_index).resample("D").sum()
@@ -374,3 +374,125 @@ extract_results_and_show(results)
     # plt.grid(True)
     # plt.tight_layout()
     # plt.show()
+
+
+# Get results
+p_inj = results.get('p_inj')
+p_with = results.get('p_with')
+p_bess_in = results.get('p_bess_in')
+p_bess_out = results.get('p_bess_out')
+e_bess_stor = results.get('e_bess_stor')
+p_elh_in = results.get('p_elh_in')
+# p_elh_out = results.get('p_elh_out')
+p_elh_out = results.get('p_cl_grid') + results.get('p_cl_rec')  # új kiszámítás
+p_hss_in = results.get('p_hss_in')
+p_hss_out = results.get('p_hss_out')
+e_hss_stor = results.get('e_hss_stor')
+t_hss = results.get('t_hss')
+p_shared = results.get('p_shared')
+p_cl_grid = results.get('p_cl_grid')
+p_cl_rec = results.get('p_cl_rec')
+p_cl_with = results.get('p_cl_with')
+d_cl = results.get('d_cl')
+p_grid_in = results.get('p_grid_in')
+p_grid_out = results.get('p_grid_out')
+p_hp_el = results.get('p_hp_el')
+p_hp_th = results.get('p_hp_th')
+T_mass = results.get('T_mass')
+T_zone = results.get('T_zone')
+p_pv = na_values[:, 1]
+p_ue = na_values[:, 0]
+p_ut = na_values[:, 2]
+# diff_hss_out = results.get('diff_hss_out').sum(axis=0)
+# diff_hss_in = results.get('diff_hss_in').sum(axis=0)
+
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+import numpy as np
+
+# 4 szezon
+t0s = [168 * 4, 2184, 4368 + 168 * 3, 6552]
+titles = ['Winter', 'Spring', 'Summer', 'Autumn']
+dt = 72
+fontsize = 14
+bar_kw = dict(width=0.8)
+
+for i, t0 in enumerate(t0s):
+    tf = t0 + dt
+    time = np.arange(t0, tf)
+    title = titles[i]
+
+    fig = plt.figure(figsize=(18, 10))
+    fig.suptitle(f"{title} – Electric hub & HP", fontsize=18)
+
+    gs = GridSpec(nrows=2, ncols=2, width_ratios=[0.8, 0.2], height_ratios=[1, 1], hspace=0.3, wspace=0.25)
+
+    # --- Electric hub subplot (bal felső) ---
+    ax = fig.add_subplot(gs[0, 0])
+    bottom = np.zeros_like(time, dtype=float)
+    h1 = ax.bar(time, p_pv[t0:tf], bottom=bottom, label=r'$P_\mathrm{pv}$', **bar_kw)
+    bottom += p_pv[t0:tf]
+    h2 = ax.bar(time, p_bess_out[t0:tf], bottom=bottom, label=r'$P_\mathrm{bess,out}$', **bar_kw)
+    bottom += p_bess_out[t0:tf]
+    h3 = ax.bar(time, p_grid_out[t0:tf], bottom=bottom, label=r'$P_\mathrm{grid,out}$', **bar_kw)
+
+    bottom = np.zeros_like(time, dtype=float)
+    h4 = ax.bar(time, -p_ue[t0:tf], bottom=bottom, label=r'$P_\mathrm{ue}$', **bar_kw)
+    bottom -= p_ue[t0:tf]
+    h5 = ax.bar(time, -p_bess_in[t0:tf], bottom=bottom, label=r'$P_\mathrm{bess,in}$', **bar_kw)
+    bottom -= p_bess_in[t0:tf]
+    h6 = ax.bar(time, -p_cl_grid[t0:tf], bottom=bottom, label=r'$P_\mathrm{cl,grid}$', **bar_kw)
+    bottom -= p_cl_grid[t0:tf]
+    h7 = ax.bar(time, -p_cl_rec[t0:tf], bottom=bottom, label=r'$P_\mathrm{cl,rec}$', **bar_kw)
+    bottom -= p_cl_rec[t0:tf]
+    h8 = ax.bar(time, -p_grid_in[t0:tf], bottom=bottom, label=r'$P_\mathrm{grid,in}$', **bar_kw)
+    bottom -= p_grid_in[t0:tf]
+    h9 = ax.bar(time, -p_hp_el[t0:tf], bottom=bottom, label=r'$P_\mathrm{hp,el}$', color="orange", **bar_kw)
+
+    axtw = ax.twinx()
+    h10, = axtw.plot(time, e_bess_stor[t0:tf], color='black', ls='--', label=r'$E_\mathrm{stor,bess}$')
+    axtw.set_ylabel("Stored energy (kWh)")
+    axtw.spines["right"].set_position(("axes", 1.0))
+    axtw.tick_params(labelsize=fontsize)
+
+    ax.set_title("Electric hub", fontsize=fontsize)
+    ax.set_xlabel("Time (h)")
+    ax.set_ylabel("Power (kW)")
+    ax.grid()
+    ax.tick_params(labelsize=fontsize)
+
+    # --- Legend (jobb felső) ---
+    legend_ax = fig.add_subplot(gs[0, 1])
+    legend_ax.axis('off')
+    legend_ax.legend([h1, h2, h3, h4, h5, h6, h7, h8, h9, h10],
+                     [r'$P_\mathrm{pv}$', r'$P_\mathrm{bess,out}$', r'$P_\mathrm{grid,out}$',
+                      r'$P_\mathrm{ue}$', r'$P_\mathrm{bess,in}$', r'$P_\mathrm{cl,grid}$',
+                      r'$P_\mathrm{cl,rec}$', r'$P_\mathrm{grid,in}$', r'$P_\mathrm{hp,el}$',
+                      r'$E_\mathrm{stor,bess}$'],
+                     fontsize=fontsize, loc='center')
+
+    # --- Temp subplot (bal alsó) ---
+    ax = fig.add_subplot(gs[1, 0])
+    d_hp_total = np.clip(np.array(d_hp_heat[t0:tf]) + np.array(d_hp_cool[t0:tf]), 0, 1)
+
+    line1, = ax.plot(time, T_zone[t0:tf], label="T_zone", color="tab:blue")
+    line2, = ax.plot(time, T_mass[t0:tf], label="T_mass", color="tab:orange")
+    line3, = ax.plot(time, T_env[t0:tf], label="T_env", linestyle="dashed", color="tab:green")
+    ax.set_ylabel("T [°C]")
+    ax.set_title("Temperatures & HP on/off ")
+    ax.grid()
+
+    ax2 = ax.twinx()
+    line4, = ax2.plot(time, d_hp_total, label="HP on/off", color="red", linestyle="dotted")
+    ax2.set_ylim(-0.05, 1.05)
+    ax2.set_ylabel("HP on/off", )
+
+    # --- Legend (jobb alsó) ---
+    legend_ax2 = fig.add_subplot(gs[1, 1])
+    legend_ax2.axis('off')
+    legend_ax2.legend([line1, line2, line3, line4],
+                      ["T_zone", "T_mass", "T_env", "HP működés"],
+                      fontsize=fontsize, loc="center")
+
+    plt.tight_layout()
+    plt.show()

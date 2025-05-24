@@ -64,7 +64,12 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
     window_area = 15  # [m^2]
     g_window = 0.6  # [1]
     solar_gain_factor = 0.3
-
+    C_zone = 2.5  # kWh/K
+    C_mass = 20.0  # kWh/K
+    R_conv = 0.4  # K/kW
+    R_rad = 0.1  # K/kW
+    R_ve = 7.0  # K/kW
+    R_ea = 40.0  # K/kW
     # Napenergia‐nyereséghez szükséges vektorok
     solar_dir = kwargs.get('solar_radiation_direct')
     solar_dif = kwargs.get('solar_radiation_diffuse')
@@ -184,6 +189,12 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
         # Komfort-feltétel: zónahőmérséklet
         prob += T_zone[t] >= T_set - 2.0  # Pl. 19 °C is elfogadható minimálisan
         prob += T_zone[t] <= T_set + 2.0  # Pl. 23 °C is elfogadható minimálisan
+
+        # Fűtési tiltás meleg időben (pl. T_env > T_zone + 2 → ne fűtsön)
+        prob += T_env_vector[t] <= T_zone[t] + 2 + (1 - d_hp_heat[t]) * 1000  # ha fűteni akar, legyen hidegebb
+
+        # Hűtési tiltás hideg időben (pl. T_env < T_zone - 2 → ne hűtsön)
+        prob += T_env_vector[t] >= T_zone[t] - 2 - (1 - d_hp_cool[t]) * 1000  # ha hűteni akar, legyen melegebb
 
         # Zóna és tömeg dinamikák (Euler diszkrét)
         if t < n_timestep - 1:
@@ -381,7 +392,7 @@ def optimize_with_hp(p_pv, p_consumed, p_ut,
 
     e_hss_stor = vol_hss_water * c_hss * (np.array(t_hss) - T_env)
     p_shared = np.minimum(np.array(p_pv) + np.array(p_bess_out) - np.array(p_bess_in),
-                          np.array(p_consumed) + np.array(p_cl_with))
+                          np.array(p_consumed) + np.array(p_cl_with) + np.array(p_hp_el))
 
     results = dict(p_inj=np.array(p_inj), p_with=np.array(p_with),
                    p_bess_in=np.array(p_bess_in), p_bess_out=np.array(p_bess_out), e_bess_stor=np.array(e_bess_stor),

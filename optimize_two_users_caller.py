@@ -35,7 +35,7 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
     figsize = (24, 15)  # Nagyobb méret a 3x3-as elrendezéshez
     fontsize = 15
     t0s = [0, 2184, 4368, 6552]  # Kezdő időt lépések (tél, tavasz, nyár, ősz)
-    dt = 168  # Egy hét (168 óra)
+    dt = 72  # Egy hét (168 óra)
     titles = ['Winter', 'Spring', 'Summer', 'Autumn']
     path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
     bar_kw = dict(width=0.8)  # Keskenyebb sávok
@@ -52,31 +52,31 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
         bottom_neg = np.zeros_like(time, dtype=float)
 
         # Felfelé: termelés és kisütés
-        ax.bar(time, na_p_pv[t0:tf, 0], bottom=bottom_pos, label=r'$P_\mathrm{pv,u0}$', color='lightgreen', hatch='///', **bar_kw)
+        ax.bar(time, na_p_pv[t0:tf, 0], bottom=bottom_pos, label=r'$P_\mathrm{pv,u0}$', color='lightgreen', **bar_kw)
         bottom_pos += na_p_pv[t0:tf, 0]
-        ax.bar(time, na_p_pv[t0:tf, 1], bottom=bottom_pos, label=r'$P_\mathrm{pv,u1}$', color='green', hatch='\\\\', **bar_kw)
+        ax.bar(time, na_p_pv[t0:tf, 1], bottom=bottom_pos, label=r'$P_\mathrm{pv,u1}$', color='green', **bar_kw)
         bottom_pos += na_p_pv[t0:tf, 1]
         ax.bar(time, results['p_bess_out'][t0:tf], bottom=bottom_pos, label=r'$P_\mathrm{bess,out}$', color='orange', **bar_kw)
         bottom_pos += results['p_bess_out'][t0:tf]
         ax.bar(time, results['p_grid_out'][t0:tf], bottom=bottom_pos, label=r'$P_\mathrm{grid,out}$', color='blue', **bar_kw)
 
         # Lefelé: igény és vételezés
-        ax.bar(time, -na_p_consumed[t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{ue,u0}$', color='lightcoral', hatch='///',
+        ax.bar(time, -na_p_consumed[t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{ue,u0}$', color='lightcoral',
                **bar_kw)
         bottom_neg -= na_p_consumed[t0:tf, 0]
-        ax.bar(time, -na_p_consumed[t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{ue,u1}$', color='red', hatch='\\\\', **bar_kw)
+        ax.bar(time, -na_p_consumed[t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{ue,u1}$', color='red', **bar_kw)
         bottom_neg -= na_p_consumed[t0:tf, 1]
         ax.bar(time, -results['p_cl_rec'][t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{cl,rec,u0}$', color='lightgrey',
-               hatch='///', **bar_kw)
+                **bar_kw)
         bottom_neg -= results['p_cl_rec'][t0:tf, 0].astype(float)
-        ax.bar(time, -results['p_cl_rec'][t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{cl,rec,u1}$', color='grey', hatch='\\\\',
+        ax.bar(time, -results['p_cl_rec'][t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{cl,rec,u1}$', color='grey',
                **bar_kw)
         bottom_neg -= results['p_cl_rec'][t0:tf, 1].astype(float)
         ax.bar(time, -results['p_cl_grid'][t0:tf, 0].astype(float), bottom=bottom_neg, label=r'$P_\mathrm{cl,grid,u0}$',
-               color='mediumorchid', hatch='///', **bar_kw)
+               color='mediumorchid', **bar_kw)
         bottom_neg -= results['p_cl_grid'][t0:tf, 0].astype(float)
         ax.bar(time, -results['p_cl_grid'][t0:tf, 1].astype(float), bottom=bottom_neg, label=r'$P_\mathrm{cl,grid,u1}$',
-               color='indigo', hatch='\\\\', **bar_kw)
+               color='indigo', **bar_kw)
         bottom_neg -= results['p_cl_grid'][t0:tf, 1].astype(float)
         ax.bar(time, -results['p_bess_in'][t0:tf], bottom=bottom_neg, label=r'$P_\mathrm{bess,in}$', color='purple', **bar_kw)
         bottom_neg -= results['p_bess_in'][t0:tf].astype(float)
@@ -248,6 +248,101 @@ def display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag=True):
         plt.tight_layout()
         plt.show()
 
+def display_figures_hub_csc(results, p_pv, p_consumed, p_ut, hss_flag=True):
+    import matplotlib.pyplot as plt
+    import matplotlib.patheffects as pe
+    import numpy as np
+
+    figsize = (24, 16)
+    fontsize = 15
+    t0s = [0, 2184, 4368, 6552]
+    dt = 72
+    titles = ['Winter', 'Spring', 'Summer', 'Autumn']
+    path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
+    bar_kw = dict(width=0.8)
+    plot_kw = dict(lw=3, path_effects=path_effect(3))
+    area_kw = dict(alpha=0.6)
+
+    for i, t0 in enumerate(t0s):
+        tf = t0 + dt
+        time = np.arange(t0, tf)
+
+        # 2x2 ábra: EH + legend, CSC + legend
+        fig, axes = plt.subplots(2, 2, figsize=figsize, gridspec_kw={'width_ratios': [0.85, 0.15]})
+        fig.suptitle(f"{titles[i]} – Community Energy System", fontsize=fontsize)
+
+        # --- ELECTRIC HUB ---
+        ax = axes[0, 0]
+        ax_legend = axes[0, 1]
+        bottom_pos = np.zeros_like(time, dtype=float)
+        bottom_neg = np.zeros_like(time, dtype=float)
+
+        ax.bar(time, p_pv[t0:tf, 0], bottom=bottom_pos, label=r'$P_\mathrm{pv,u0}$', color='lightgreen', **bar_kw)
+        bottom_pos += p_pv[t0:tf, 0]
+        ax.bar(time, p_pv[t0:tf, 1], bottom=bottom_pos, label=r'$P_\mathrm{pv,u1}$', color='green', **bar_kw)
+        bottom_pos += p_pv[t0:tf, 1]
+        ax.bar(time, results['p_bess_out'][t0:tf], bottom=bottom_pos, label=r'$P_\mathrm{bess,out}$', color='orange', **bar_kw)
+        bottom_pos += results['p_bess_out'][t0:tf]
+        ax.bar(time, results['p_grid_out'][t0:tf], bottom=bottom_pos, label=r'$P_\mathrm{grid,out}$', color='blue', **bar_kw)
+
+        ax.bar(time, -p_consumed[t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{ue,u0}$', color='lightcoral', **bar_kw)
+        bottom_neg -= p_consumed[t0:tf, 0]
+        ax.bar(time, -p_consumed[t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{ue,u1}$', color='red', **bar_kw)
+        bottom_neg -= p_consumed[t0:tf, 1]
+        ax.bar(time, -results['p_bess_in'][t0:tf], bottom=bottom_neg, label=r'$P_\mathrm{bess,in}$', color='purple', **bar_kw)
+        bottom_neg -= results['p_bess_in'][t0:tf]
+        ax.bar(time, -results['p_grid_in'][t0:tf], bottom=bottom_neg, label=r'$P_\mathrm{grid,in}$', color='navy', **bar_kw)
+
+        ax2 = ax.twinx()
+        ax2.plot(time, results['e_bess_stor'][t0:tf], color='black', ls='--', label=r'$E_\mathrm{stor,bess}$')
+        ax2.set_ylabel("Stored energy (kWh)", color='black')
+        ax2.tick_params(axis='y', colors='black')
+        ax2.spines['right'].set_color('black')
+
+        ax.set_xlabel("Time (h)")
+        ax.set_ylabel("Power (kW)")
+        ax.set_title("Electric Hub", fontsize=fontsize)
+        ax.grid(True)
+
+        handles_eh, labels_eh = ax.get_legend_handles_labels()
+        handles2, labels2 = ax2.get_legend_handles_labels()
+        ax_legend.legend(handles_eh + handles2, labels_eh + labels2, loc='center', fontsize=12)
+        ax_legend.axis('off')
+
+        # --- CSC ---
+        ax_csc = axes[1, 0]
+        ax_csc_legend = axes[1, 1]
+
+        t_plot = np.linspace(t0, tf, 1000)
+        interp = lambda x: np.interp(t_plot, time, x)
+
+        p_inj_plot = interp(results['p_inj'][t0:tf])
+        p_with_plot = interp(results['p_with'][t0:tf])
+        p_shared_plot = np.minimum(p_inj_plot, p_with_plot)
+
+        ax_csc.plot(t_plot, p_inj_plot, label=r'$P_\mathrm{inj}$', color='tab:red', **plot_kw)
+        ax_csc.plot(t_plot, p_with_plot, label=r'$P_\mathrm{with}$', color='tab:blue', **plot_kw)
+        ax_csc.plot(t_plot, p_shared_plot, label=r'$P_\mathrm{shared}$', color='tab:green', **plot_kw)
+
+        ax_csc.fill_between(t_plot, p_shared_plot, p_with_plot, where=p_with_plot > p_shared_plot,
+                            label=r'E$_\mathrm{\leftarrow grid}$', color='tab:blue', **area_kw)
+        ax_csc.fill_between(t_plot, p_shared_plot, p_inj_plot, where=p_inj_plot > p_shared_plot,
+                            label=r'E$_\mathrm{\rightarrow grid}$', color='tab:red', **area_kw)
+        ax_csc.fill_between(t_plot, 0, p_shared_plot, where=p_shared_plot > 0,
+                            label=r'E$_\mathrm{shared}$', color='tab:green', alpha=0.3)
+
+        ax_csc.set_xlabel("Time (h)", fontsize=fontsize)
+        ax_csc.set_ylabel("Power (kW)", fontsize=fontsize)
+        ax_csc.set_title("Community Exchange", fontsize=fontsize)
+        ax_csc.tick_params(labelsize=fontsize)
+        ax_csc.grid(True)
+
+        handles_csc, labels_csc = ax_csc.get_legend_handles_labels()
+        ax_csc_legend.legend(handles_csc, labels_csc, loc='center', fontsize=12, ncol=2)
+        ax_csc_legend.axis('off')
+
+        plt.tight_layout()
+        plt.show()
 
 def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
     # Eredmények kinyerése és numerikus típus biztosítása
@@ -304,141 +399,100 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
         'p_shared': p_shared
     }
 
-    display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag)
+    # display_figures_two_users(results, p_pv, p_consumed, p_ut, hss_flag)
+    display_figures_hub_csc(results, p_pv, p_consumed, p_ut, hss_flag)
 
 
 # Optimalizálás futtatása
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(
     p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed,
-    size_elh=np.array([2, 2.5]), size_bess=20, size_hss=np.array([4, 5]), run_lp=False, objective="environmental",
+    size_elh=np.array([2, 2.5]), size_bess=8, size_hss=np.array([4, 5]), run_lp=False, objective="environmental",
     gapRel=0.01
 )
 
 # Eredmények megjelenítése
 extract_results_and_show_two_users(results, na_p_pv, na_p_consumed, na_p_ut)
 
-import seaborn as sns
-import matplotlib.pyplot as plt
 
-
-def calculate_ssi_sci(p_shared, p_with, p_inj):
-    ssi = np.sum(p_shared) / np.sum(p_with) if np.sum(p_with) > 0 else 0
-    sci = np.sum(p_shared) / np.sum(p_inj) if np.sum(p_inj) > 0 else 0
-    return ssi, sci
-
-
-def generate_ssi_sci_heatmaps(results_dict, pv_ratios, bess_sizes, base_pv, base_consumed):
-    ssi_opt = np.zeros((len(bess_sizes), len(pv_ratios)))
-    sci_opt = np.zeros_like(ssi_opt)
-    ssi_prof = np.zeros_like(ssi_opt)
-    sci_prof = np.zeros_like(ssi_opt)
-
-    for i, bess in enumerate(bess_sizes):
-        for j, ratio in enumerate(pv_ratios):
-            res_opt = results_dict["optimal"][(bess, ratio)]
-            res_prof = results_dict["profile"][(bess, ratio)]
-
-            p_pv = base_pv * ratio
-            p_consumed = base_consumed
-
-            ssi_o, sci_o = calculate_ssi_sci(res_opt['p_shared'], res_opt['p_with'], p_pv, p_consumed)
-            ssi_p, sci_p = calculate_ssi_sci(res_prof['p_shared'], res_prof['p_with'], p_pv, p_consumed)
-
-            ssi_opt[i, j] = ssi_o
-            sci_opt[i, j] = sci_o
-            ssi_prof[i, j] = ssi_p
-            sci_prof[i, j] = sci_p
-
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-
-    sns.heatmap(ssi_opt, annot=True, fmt=".2f", xticklabels=pv_ratios, yticklabels=bess_sizes, ax=axes[0, 0],
-                cmap="YlGnBu")
-    axes[0, 0].set_title("SSI - Optimal")
-    axes[0, 0].set_xlabel("PV ratio")
-    axes[0, 0].set_ylabel("BESS size [kWh]")
-
-    sns.heatmap(sci_opt, annot=True, fmt=".2f", xticklabels=pv_ratios, yticklabels=bess_sizes, ax=axes[0, 1],
-                cmap="YlGnBu")
-    axes[0, 1].set_title("SCI - Optimal")
-    axes[0, 1].set_xlabel("PV ratio")
-    axes[0, 1].set_ylabel("BESS size [kWh]")
-
-    sns.heatmap(ssi_prof, annot=True, fmt=".2f", xticklabels=pv_ratios, yticklabels=bess_sizes, ax=axes[1, 0],
-                cmap="YlOrRd")
-    axes[1, 0].set_title("SSI - Profile control")
-    axes[1, 0].set_xlabel("PV ratio")
-    axes[1, 0].set_ylabel("BESS size [kWh]")
-
-    sns.heatmap(sci_prof, annot=True, fmt=".2f", xticklabels=pv_ratios, yticklabels=bess_sizes, ax=axes[1, 1],
-                cmap="YlOrRd")
-    axes[1, 1].set_title("SCI - Profile control")
-    axes[1, 1].set_xlabel("PV ratio")
-    axes[1, 1].set_ylabel("BESS size [kWh]")
-
-    plt.tight_layout()
-    plt.show()
-
-# Bemeneti paraméterek
-pv_ratios = [0.25, 0.5, 1.0, 1.5, 2.0]
-bess_sizes = [0, 10, 20, 30, 40]
-
-# Alap PV és fogyasztási profil 2 felhasználóra
-base_pv = na_p_pv.copy()
-base_consumed = na_p_consumed.copy()
-
-# Eredmények gyűjtése
-results_dict = {"optimal": {}, "profile": {}}
-
-for ratio in pv_ratios:
-    for bess in bess_sizes:
-        # Méretezett bemenetek
-        p_pv_scaled = base_pv * ratio
-
-        # PROFILE SCENARIO (egyszerű kézi logika minden userre külön)
-        soc = np.zeros((len(p_pv_scaled),))  # közös BESS
-        bess_capacity = bess
-        p_with = np.sum(base_consumed, axis=1)
-        p_inj = np.sum(p_pv_scaled, axis=1)
-        bess_in = np.zeros_like(p_inj)
-        bess_out = np.zeros_like(p_inj)
-
-        for t in range(len(p_inj)):
-            demand = p_with[t]
-            surplus = p_inj[t] - demand
-            if surplus >= 0:
-                charge = min(surplus, bess_capacity - soc[t-1] if t > 0 else bess_capacity)
-                soc[t] = soc[t-1] + charge if t > 0 else charge
-                bess_in[t] = charge
-                p_inj[t] = surplus - charge
-            else:
-                discharge = min(-surplus, soc[t-1] if t > 0 else 0)
-                bess_out[t] = discharge
-                soc[t] = soc[t-1] - discharge if t > 0 else 0
-                p_inj[t] += discharge
-
-        shared = np.minimum(p_inj, p_with)
-
-        # Eredmények mentése
-        results_dict["profile"][(bess, ratio)] = {
-            "p_shared": shared,
-            "p_with": p_with,
-            "p_inj": p_inj
-        }
-
-        # OPTIMAL CONTROL SCENARIO
-        results, *_ = optimize_two_users(
-            p_pv=p_pv_scaled, p_consumed=base_consumed, p_ut=na_p_ut,
-            size_elh=np.array([2, 2.5]), size_bess=bess, gapRel=0.01,
-            size_hss=np.array([4, 5]), run_lp=False, objective="environmental"
-        )
-
-        results_dict["optimal"][(bess, ratio)] = {
-            "p_shared": results["p_shared"],
-            "p_with": results["p_with"],
-            "p_inj": results["p_inj"]
-        }
-
-# Generáljunk diagramokat
-generate_ssi_sci_heatmaps(results_dict, pv_ratios, bess_sizes, base_pv.sum(axis=1), base_consumed.sum(axis=1))
-
-
+# # Paraméterek
+# pv_ratios = [0.25, 0.5, 1.0, 1.5, 2.0]
+# bess_sizes = [0, 4, 8, 12, 16]
+# shape = (len(pv_ratios), len(bess_sizes))
+#
+# sc_profile = np.zeros(shape)
+# ss_profile = np.zeros(shape)
+# sc_optimal = np.zeros(shape)
+# ss_optimal = np.zeros(shape)
+#
+# # Forrásadatok
+# p_consumed_total = na_p_consumed.sum(axis=1)  # P_ue összesítve
+# p_ut_total = na_p_ut.sum(axis=1)              # P_ut összesítve
+# base_pv_total = na_p_pv.sum(axis=1)           # P_pv összesítve
+#
+# for i, pv_ratio in enumerate(pv_ratios):
+#     for j, bess_size in enumerate(bess_sizes):
+#         # --- PROFILE logika ---
+#         p_pv = base_pv_total * pv_ratio
+#         p_ue = p_consumed_total + p_ut_total
+#         bess_soc = np.zeros(len(p_pv))
+#         bess_out = np.zeros(len(p_pv))
+#         bess_in = np.zeros(len(p_pv))
+#
+#         for t in range(len(p_pv)):
+#             net = p_pv[t] - p_ue[t]
+#             if net >= 0:
+#                 charge = min(net, bess_size - (bess_soc[t-1] if t > 0 else 0))
+#                 bess_soc[t] = (bess_soc[t-1] if t > 0 else 0) + charge
+#                 bess_in[t] = charge
+#             else:
+#                 discharge = min(-net, bess_soc[t-1] if t > 0 else 0)
+#                 bess_soc[t] = (bess_soc[t-1] if t > 0 else 0) - discharge
+#                 bess_out[t] = discharge
+#
+#         p_inj_profile = p_pv + bess_out
+#         p_with_profile = p_ue
+#         shared_profile = np.minimum(p_inj_profile, p_with_profile)
+#
+#         sc_profile[i, j] = np.sum(shared_profile) / np.sum(p_inj_profile) if np.sum(p_inj_profile) > 0 else 0
+#         ss_profile[i, j] = np.sum(shared_profile) / np.sum(p_with_profile) if np.sum(p_with_profile) > 0 else 0
+#
+#         # --- OPTIMAL logika ---
+#         p_pv_2user = na_p_pv * pv_ratio
+#         results, *_ = optimize_two_users(
+#             p_pv=p_pv_2user,
+#             p_consumed=na_p_consumed,
+#             p_ut=na_p_ut,
+#             size_elh=[2, 2.5],
+#             size_bess=bess_size,
+#             size_hss=[4, 4],
+#             vol_hss_water=[120, 160],
+#             dt=1,
+#             msg=False,
+#             objective="environmental",
+#             gapRel=0.01
+#         )
+#
+#         p_inj_opt = ensure_numeric(results['p_inj'], var_name='p_inj')
+#         p_with_opt = ensure_numeric(results['p_with'], var_name='p_with')
+#         p_shared_opt = ensure_numeric(results['p_shared'], var_name='p_shared')
+#
+#         sc_optimal[i, j] = np.sum(p_shared_opt) / np.sum(p_inj_opt) if np.sum(p_inj_opt) > 0 else 0
+#         ss_optimal[i, j] = np.sum(p_shared_opt) / np.sum(p_with_opt) if np.sum(p_with_opt) > 0 else 0
+#
+# import seaborn as sns
+# import matplotlib.pyplot as plt
+#
+# def plot_heatmap(data, title):
+#     plt.figure(figsize=(8, 6))
+#     sns.heatmap(data, annot=True, fmt=".2f", cmap="YlGnBu",
+#                 xticklabels=bess_sizes, yticklabels=pv_ratios)
+#     plt.xlabel("BESS size [kWh]")
+#     plt.ylabel("PV ratio")
+#     plt.title(title)
+#     plt.tight_layout()
+#     plt.show()
+#
+# plot_heatmap(sc_profile, "SCI – Profile Scenario (Two Users)")
+# plot_heatmap(ss_profile, "SSI – Profile Scenario (Two Users)")
+# plot_heatmap(sc_optimal, "SCI – Optimal Scenario (Two Users)")
+# plot_heatmap(ss_optimal, "SSI – Optimal Scenario (Two Users)")

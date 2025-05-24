@@ -21,7 +21,7 @@ def display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_sto
     figsize = (20, 15)
     fontsize = 15
     t0s = [0, 2184, 4368, 6552]
-    dt = 168
+    dt = 72
     titles = ['Winter', 'Spring', 'Summer', 'Autumn']
     path_effect = lambda lw: [pe.Stroke(linewidth=1.5 * lw, foreground='w'), pe.Normal()]
     bar_kw = dict(width=0.8, )
@@ -274,11 +274,11 @@ def extract_results_and_show(results):
 
 
 results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
-                                                                 size_elh=2, size_bess=8, size_hss=4, run_lp=False, gapRel=0.01,
+                                                                 size_elh=2, size_bess=8, size_hss=4, run_lp=False, gapRel=0.005,
                                                                  objective="environmental")
 extract_results_and_show(results)
 
-pv_ratios = [0.25, 0.5, 1.0, 1.5, 2.0]
+pv_ratios = [0.75, 1.0, 1.25, 1.5, 2.0]
 bess_sizes = [0, 2, 4, 6, 8, 10]
 
 shape = (len(pv_ratios), len(bess_sizes))
