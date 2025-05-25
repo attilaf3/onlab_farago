@@ -252,6 +252,7 @@ def display_figures_hub_csc(results, p_pv, p_consumed, p_ut, hss_flag=True):
     import matplotlib.pyplot as plt
     import matplotlib.patheffects as pe
     import numpy as np
+    from matplotlib.gridspec import GridSpec
 
     figsize = (24, 16)
     fontsize = 15
@@ -267,16 +268,17 @@ def display_figures_hub_csc(results, p_pv, p_consumed, p_ut, hss_flag=True):
         tf = t0 + dt
         time = np.arange(t0, tf)
 
-        # 2x2 ábra: EH + legend, CSC + legend
-        fig, axes = plt.subplots(2, 2, figsize=figsize, gridspec_kw={'width_ratios': [0.85, 0.15]})
-        fig.suptitle(f"{titles[i]} – Community Energy System", fontsize=fontsize)
+        # GridSpec használata a pontos elrendezéshez
+        fig = plt.figure(figsize=figsize)
+        gs = GridSpec(nrows=2, ncols=2, width_ratios=[0.85, 0.15], height_ratios=[1, 1], hspace=0.3, wspace=0.25)
 
         # --- ELECTRIC HUB ---
-        ax = axes[0, 0]
-        ax_legend = axes[0, 1]
+        ax = fig.add_subplot(gs[0, 0])
+        ax_legend = fig.add_subplot(gs[0, 1])
         bottom_pos = np.zeros_like(time, dtype=float)
         bottom_neg = np.zeros_like(time, dtype=float)
 
+        # Felfelé: termelés és kisütés
         ax.bar(time, p_pv[t0:tf, 0], bottom=bottom_pos, label=r'$P_\mathrm{pv,u0}$', color='lightgreen', **bar_kw)
         bottom_pos += p_pv[t0:tf, 0]
         ax.bar(time, p_pv[t0:tf, 1], bottom=bottom_pos, label=r'$P_\mathrm{pv,u1}$', color='green', **bar_kw)
@@ -285,33 +287,46 @@ def display_figures_hub_csc(results, p_pv, p_consumed, p_ut, hss_flag=True):
         bottom_pos += results['p_bess_out'][t0:tf]
         ax.bar(time, results['p_grid_out'][t0:tf], bottom=bottom_pos, label=r'$P_\mathrm{grid,out}$', color='blue', **bar_kw)
 
+        # Lefelé: fogyasztás és töltés
         ax.bar(time, -p_consumed[t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{ue,u0}$', color='lightcoral', **bar_kw)
         bottom_neg -= p_consumed[t0:tf, 0]
         ax.bar(time, -p_consumed[t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{ue,u1}$', color='red', **bar_kw)
         bottom_neg -= p_consumed[t0:tf, 1]
+        ax.bar(time, -results['p_cl_rec'][t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{cl,rec,u0}$', color='lightgrey', **bar_kw)
+        bottom_neg -= results['p_cl_rec'][t0:tf, 0].astype(float)
+        ax.bar(time, -results['p_cl_rec'][t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{cl,rec,u1}$', color='grey', **bar_kw)
+        bottom_neg -= results['p_cl_rec'][t0:tf, 1].astype(float)
+        ax.bar(time, -results['p_cl_grid'][t0:tf, 0], bottom=bottom_neg, label=r'$P_\mathrm{cl,grid,u0}$', color='mediumorchid', **bar_kw)
+        bottom_neg -= results['p_cl_grid'][t0:tf, 0].astype(float)
+        ax.bar(time, -results['p_cl_grid'][t0:tf, 1], bottom=bottom_neg, label=r'$P_\mathrm{cl,grid,u1}$', color='indigo', **bar_kw)
+        bottom_neg -= results['p_cl_grid'][t0:tf, 1].astype(float)
         ax.bar(time, -results['p_bess_in'][t0:tf], bottom=bottom_neg, label=r'$P_\mathrm{bess,in}$', color='purple', **bar_kw)
         bottom_neg -= results['p_bess_in'][t0:tf]
         ax.bar(time, -results['p_grid_in'][t0:tf], bottom=bottom_neg, label=r'$P_\mathrm{grid,in}$', color='navy', **bar_kw)
 
+        # BESS SOC
         ax2 = ax.twinx()
         ax2.plot(time, results['e_bess_stor'][t0:tf], color='black', ls='--', label=r'$E_\mathrm{stor,bess}$')
         ax2.set_ylabel("Stored energy (kWh)", color='black')
         ax2.tick_params(axis='y', colors='black')
         ax2.spines['right'].set_color('black')
 
-        ax.set_xlabel("Time (h)")
-        ax.set_ylabel("Power (kW)")
+        # Beállítások
+        ax.set_xlabel("Time (h)", fontsize=fontsize)
+        ax.set_ylabel("Power (kW)", fontsize=fontsize)
         ax.set_title("Electric Hub", fontsize=fontsize)
+        ax.tick_params(labelsize=fontsize)
         ax.grid(True)
 
+        # Jelmagyarázat
         handles_eh, labels_eh = ax.get_legend_handles_labels()
         handles2, labels2 = ax2.get_legend_handles_labels()
-        ax_legend.legend(handles_eh + handles2, labels_eh + labels2, loc='center', fontsize=12)
+        ax_legend.legend(handles_eh + handles2, labels_eh + labels2, loc='center', fontsize=16, ncol=2)
         ax_legend.axis('off')
 
         # --- CSC ---
-        ax_csc = axes[1, 0]
-        ax_csc_legend = axes[1, 1]
+        ax_csc = fig.add_subplot(gs[1, 0])
+        ax_csc_legend = fig.add_subplot(gs[1, 1])
 
         t_plot = np.linspace(t0, tf, 1000)
         interp = lambda x: np.interp(t_plot, time, x)
@@ -331,15 +346,20 @@ def display_figures_hub_csc(results, p_pv, p_consumed, p_ut, hss_flag=True):
         ax_csc.fill_between(t_plot, 0, p_shared_plot, where=p_shared_plot > 0,
                             label=r'E$_\mathrm{shared}$', color='tab:green', alpha=0.3)
 
+        # Beállítások
         ax_csc.set_xlabel("Time (h)", fontsize=fontsize)
         ax_csc.set_ylabel("Power (kW)", fontsize=fontsize)
         ax_csc.set_title("Community Exchange", fontsize=fontsize)
         ax_csc.tick_params(labelsize=fontsize)
         ax_csc.grid(True)
 
+        # Jelmagyarázat
         handles_csc, labels_csc = ax_csc.get_legend_handles_labels()
-        ax_csc_legend.legend(handles_csc, labels_csc, loc='center', fontsize=12, ncol=2)
+        ax_csc_legend.legend(handles_csc, labels_csc, loc='center', fontsize=16, ncol=2)
         ax_csc_legend.axis('off')
+
+        # Cím pozícionálása
+        fig.suptitle(f"{titles[i]} – Community Energy System", fontsize=fontsize, ha='center', va='top')
 
         plt.tight_layout()
         plt.show()
@@ -407,7 +427,7 @@ def extract_results_and_show_two_users(results, p_pv, p_consumed, p_ut):
 results, status, objective, user_ids, num_vars, num_constraints = optimize_two_users(
     p_pv=na_p_pv, p_ut=na_p_ut, p_consumed=na_p_consumed,
     size_elh=np.array([2, 2.5]), size_bess=8, size_hss=np.array([4, 5]), run_lp=False, objective="environmental",
-    gapRel=0.01
+    gapRel=0.005
 )
 
 # Eredmények megjelenítése

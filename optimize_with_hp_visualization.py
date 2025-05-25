@@ -473,25 +473,28 @@ for i, t0 in enumerate(t0s):
 
     # --- Temp subplot (bal alsó) ---
     ax = fig.add_subplot(gs[1, 0])
-    d_hp_total = np.clip(np.array(d_hp_heat[t0:tf]) + np.array(d_hp_cool[t0:tf]), 0, 1)
+    d_hp_heat_part = np.array(d_hp_heat[t0:tf])
+    d_hp_cool_part = np.array(d_hp_cool[t0:tf])
 
     line1, = ax.plot(time, T_zone[t0:tf], label="T_zone", color="tab:blue")
     line2, = ax.plot(time, T_mass[t0:tf], label="T_mass", color="tab:orange")
     line3, = ax.plot(time, T_env[t0:tf], label="T_env", linestyle="dashed", color="tab:green")
+    ax.set_xlabel("Time (h)")
     ax.set_ylabel("T [°C]")
-    ax.set_title("Temperatures & HP on/off ")
+    ax.set_title("Temperatures & HP on/off ", fontsize=fontsize)
     ax.grid()
 
     ax2 = ax.twinx()
-    line4, = ax2.plot(time, d_hp_total, label="HP on/off", color="red", linestyle="dotted")
+    line4a, = ax2.plot(time, d_hp_heat_part, label="Heating", color="red", linestyle="dotted")
+    line4b, = ax2.plot(time, d_hp_cool_part, label="Cooling", color="blue", linestyle="dotted")
     ax2.set_ylim(-0.05, 1.05)
     ax2.set_ylabel("HP on/off", )
 
     # --- Legend (jobb alsó) ---
     legend_ax2 = fig.add_subplot(gs[1, 1])
     legend_ax2.axis('off')
-    legend_ax2.legend([line1, line2, line3, line4],
-                      ["T_zone", "T_mass", "T_env", "HP működés"],
+    legend_ax2.legend([line1, line2, line3, line4a, line4b],
+                      ["T_zone", "T_mass", "T_env", "Heating", "Cooling"],
                       fontsize=fontsize, loc="center")
 
     plt.tight_layout()
