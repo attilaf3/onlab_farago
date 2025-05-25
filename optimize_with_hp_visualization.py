@@ -42,7 +42,7 @@ results, status, objective, num_vars, num_constraints = optimize_with_hp(p_pv=p_
                                                                          cop_hp_vector=COP,
                                                                          solar_radiation_direct=solar_dir,
                                                                          solar_radiation_diffuse=solar_dif,
-                                                                         gapRel=0.01)
+                                                                         gapRel=0.005)
 
 # Index generálása
 n_hours = len(results["T_zone"])
@@ -453,11 +453,11 @@ for i, t0 in enumerate(t0s):
     h10, = axtw.plot(time, e_bess_stor[t0:tf], color='black', ls='--', label=r'$E_\mathrm{stor,bess}$')
     axtw.set_ylabel("Stored energy (kWh)")
     axtw.spines["right"].set_position(("axes", 1.0))
-    axtw.tick_params(labelsize=fontsize)
+    # axtw.tick_params(labelsize=fontsize)
 
     ax.set_title("Electric hub", fontsize=fontsize)
-    ax.set_xlabel("Time (h)")
-    ax.set_ylabel("Power (kW)")
+    ax.set_xlabel("Time (h)", fontsize=fontsize)
+    ax.set_ylabel("Power (kW)", fontsize=fontsize)
     ax.grid()
     ax.tick_params(labelsize=fontsize)
 
@@ -469,33 +469,35 @@ for i, t0 in enumerate(t0s):
                       r'$P_\mathrm{ue}$', r'$P_\mathrm{bess,in}$', r'$P_\mathrm{cl,grid}$',
                       r'$P_\mathrm{cl,rec}$', r'$P_\mathrm{grid,in}$', r'$P_\mathrm{hp,el}$',
                       r'$E_\mathrm{stor,bess}$'],
-                     fontsize=fontsize, loc='center')
+                     fontsize=16, loc='center', ncol=2)
 
     # --- Temp subplot (bal alsó) ---
     ax = fig.add_subplot(gs[1, 0])
     d_hp_heat_part = np.array(d_hp_heat[t0:tf])
     d_hp_cool_part = np.array(d_hp_cool[t0:tf])
 
-    line1, = ax.plot(time, T_zone[t0:tf], label="T_zone", color="tab:blue")
-    line2, = ax.plot(time, T_mass[t0:tf], label="T_mass", color="tab:orange")
-    line3, = ax.plot(time, T_env[t0:tf], label="T_env", linestyle="dashed", color="tab:green")
-    ax.set_xlabel("Time (h)")
-    ax.set_ylabel("T [°C]")
+    line1, = ax.plot(time, T_zone[t0:tf], label=r'$T_\mathrm{zone}$', color="tab:blue")
+    line2, = ax.plot(time, T_mass[t0:tf], label=r'$T_\mathrm{mass}$', color="tab:orange")
+    line3, = ax.plot(time, T_env[t0:tf], label=r'$T_\mathrm{env}$', linestyle="dashed", color="tab:green")
+    ax.set_xlabel("Time (h)", fontsize=fontsize)
+    ax.set_ylabel("T [°C]", fontsize=fontsize)
     ax.set_title("Temperatures & HP on/off ", fontsize=fontsize)
+    ax.tick_params(labelsize=fontsize)
     ax.grid()
 
     ax2 = ax.twinx()
-    line4a, = ax2.plot(time, d_hp_heat_part, label="Heating", color="red", linestyle="dotted")
-    line4b, = ax2.plot(time, d_hp_cool_part, label="Cooling", color="blue", linestyle="dotted")
+    line4a, = ax2.plot(time, d_hp_heat_part, label="Heating ON", color="red", linestyle="dotted")
+    line4b, = ax2.plot(time, d_hp_cool_part, label="Cooling ON", color="blue", linestyle="dotted")
+    ax2.set_yticks([0, 1])
     ax2.set_ylim(-0.05, 1.05)
-    ax2.set_ylabel("HP on/off", )
+    ax2.set_ylabel("HP on/off")
 
     # --- Legend (jobb alsó) ---
     legend_ax2 = fig.add_subplot(gs[1, 1])
     legend_ax2.axis('off')
     legend_ax2.legend([line1, line2, line3, line4a, line4b],
-                      ["T_zone", "T_mass", "T_env", "Heating", "Cooling"],
-                      fontsize=fontsize, loc="center")
+                      [r'$T_\mathrm{zone}$', r'$T_\mathrm{mass}$', r'$T_\mathrm{env}$', "Heating ON", "Cooling ON"],
+                      fontsize=16, loc="center")
 
     plt.tight_layout()
     plt.show()
