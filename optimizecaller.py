@@ -273,10 +273,10 @@ def extract_results_and_show(results):
                     p_cl_grid, p_cl_with, e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl, p_grid_in, p_grid_out, p_elh_in)
 
 
-results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
-                                                                 size_elh=2, size_bess=8, size_hss=4, run_lp=False, gapRel=0.005,
-                                                                 objective="environmental")
-extract_results_and_show(results)
+# results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],
+#                                                                  size_elh=2, size_bess=10, size_hss=4, run_lp=False, gapRel=0.005,
+#                                                                  objective="environmental")
+# extract_results_and_show(results)
 
 pv_ratios = [0.75, 1.0, 1.25, 1.5, 2.0]
 bess_sizes = [0, 2, 4, 6, 8, 10]
@@ -332,6 +332,44 @@ for i, pv_ratio in enumerate(pv_ratios):
         # ss_optimal[i, j] = 1 - np.sum(p_grid_in) / (np.sum(p_consumed) + np.sum(cl_with));
         ss_optimal[i, j] = np.sum(results['p_shared']) / np.sum(results['p_with'])
 
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# PV és BESS paraméterek, ha még nem definiáltad volna:
+pv_ratios = [0.25, 0.5, 1.0, 1.5, 2.0]
+bess_sizes = [0, 2, 4, 6, 8, 10]
+
+# Vmin és vmax beállítása
+vmin = 0.1
+vmax = 1.0
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+
+# SCI heatmap
+sns.heatmap(sc_optimal, ax=ax1, annot=True, fmt=".2f", cmap="RdYlGn",
+            xticklabels=bess_sizes,
+            yticklabels=[str(r) for r in pv_ratios],
+            vmin=vmin, vmax=vmax, cbar=True)
+ax1.set_title("SCI - Optimal Control")
+ax1.set_xlabel("BESS size [kWh]")
+ax1.set_ylabel("PV ratio")
+ax1.tick_params(axis='y', rotation=0)  # vízszintesen írja ki a y-tengely értékeket
+
+# SSI heatmap
+sns.heatmap(ss_optimal, ax=ax2, annot=True, fmt=".2f", cmap="RdYlGn",
+            xticklabels=bess_sizes,
+            yticklabels=[str(r) for r in pv_ratios],  # itt is megadható
+            vmin=vmin, vmax=vmax, cbar=True)
+ax2.set_title("SSI - Optimal Control")
+ax2.set_xlabel("BESS size [kWh]")
+ax2.set_ylabel("")  # ne duplázzuk a tengelycímkéket
+ax2.tick_params(axis='y', rotation=0)
+
+plt.tight_layout()
+plt.show()
+
+
 # 1. Heatmapek
 def plot_heatmap(data, title):
     plt.figure(figsize=(7, 5))
@@ -343,10 +381,10 @@ def plot_heatmap(data, title):
     plt.tight_layout()
     plt.show()
 
-plot_heatmap(sc_profile, "SC - Profile")
-plot_heatmap(ss_profile, "SS - Profile")
-plot_heatmap(sc_optimal, "SC - Optimal Control")
-plot_heatmap(ss_optimal, "SS - Optimal Control")
+# plot_heatmap(sc_profile, "SC - Profile")
+# plot_heatmap(ss_profile, "SS - Profile")
+# plot_heatmap(sc_optimal, "SC - Optimal Control")
+# plot_heatmap(ss_optimal, "SS - Optimal Control")
 
 import matplotlib.patches as mpatches
 
@@ -656,8 +694,8 @@ def extract_results_and_show(results):
     p_pv = na_values[:, 1]
     p_ue = na_values[:, 0]
     p_ut = na_values[:, 2]
-    display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_stor, p_elh_out, p_ut, p_shared, p_cl_rec,
-                    p_cl_grid, p_cl_with, e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl, p_grid_in, p_grid_out, p_elh_in)
+    # display_figures(p_pv, p_bess_out, p_with, p_ue, p_bess_in, p_inj, e_bess_stor, p_elh_out, p_ut, p_shared, p_cl_rec,
+    #                 p_cl_grid, p_cl_with, e_hss_stor, p_hss_out, p_hss_in, t_hss, d_cl, p_grid_in, p_grid_out, p_elh_in)
 
 
 # results, status, objective, num_vars, num_constraints = optimize(p_pv=na_values[:, 1], p_consumed=na_values[:, 0], p_ut=na_values[:, 2],

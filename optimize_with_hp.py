@@ -439,7 +439,7 @@ solar_dif = na_values[:, 6]
 COP = 2.0 + 1.5 / (1 + np.exp(-0.2 * (T_env - 5)))
 
 results, status, objective, num_vars, num_constraints = optimize_with_hp(p_pv=p_pv, p_consumed=p_consumed, p_ut=p_ut,
-                                                                 size_elh=2, size_bess=5, size_hss=4, run_lp=False,
+                                                                 size_elh=2, size_bess=8, size_hss=4, run_lp=False,
                                                                  objective="environmental", T_env_vector=T_env,
                                                                  cop_hp_vector=COP,
                                                                  solar_radiation_direct=solar_dir,
