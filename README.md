@@ -1,32 +1,33 @@
-# ONLAB – Energiaközösségek modellezése
+# ONLAB – Renewable Energy Communities Modeling and Optimization
 
-Ez a projekt egyetemi szakdolgozati munka keretében készült, és célja különböző energiaközösségi rendszerek determinisztikus optimalizálása. A modellek a megújuló energiatermelés, energiatárolás (BESS és hőtároló), valamint vezérelhető hőtermelők (bojler, hőszivattyú) működését vizsgálják órás felbontásban egy teljes évi szimulációval.
+This repository contains the code and documentation for a BSc thesis project focused on modeling and optimizing different types of renewable energy community (REC) systems. The models simulate and optimize energy flows for residential-scale systems involving photovoltaic (PV) generation, battery energy storage (BESS), thermal storage, and controllable thermal loads such as electric boilers and heat pumps.
 
-A számítások célja a rendszer **környezeti teljesítményének javítása**: a helyben felhasznált megújuló energia növelése, a hálózattól való függés csökkentése, valamint az önfogyasztás és önellátás optimalizálása.
+The goal is to improve the environmental performance of local energy systems through increased self-consumption and self-sufficiency, while reducing dependency on the external grid.
 
-## Tartalom
+## Structure
 
-| Fájl | Leírás |
-|------|--------|
-| `optimize.py` | Egyfelhasználós modell (PV + ELH + BESS + HSS) optimalizálása |
-| `optimize_two_users.py` | Kétfelhasználós közösségi modell optimalizálása (megosztott BESS, külön bojlerek) |
-| `optimizecaller.py` | A futások vezérlése, szcenáriók generálása |
-| `input.csv` | Idősoros bemeneti adatok (PV, fogyasztás, HMV, időjárás) |
-| `plots/` | A vizualizációk: energiamérlegek, SCI/SSI mutatók, éves és szezonális diagramok |
-| `docs/` | A szakdolgozat LaTeX-formátumban és PDF-ben (`onlab.pdf`) |
+| File / Folder | Description |
+|---------------|-------------|
+| `optimize.py` | Optimization model for a single-user system (PV + ELH + BESS + HSS) |
+| `optimize_two_users.py` | Optimization model for a two-user community with shared BESS and individual boilers |
+| `optimize_with_hp.py` | OpOptimization model for a single-user system with heatpump (PV + ELH + BESS + HSS + HP) |
+| `optimizecaller.py` | Visualization of results of the one-user system |
+| `optimize_two_user_visualization.py` | Visualization of results of the two-user system |
+| `optimize_with_hp_visualization.py` | Visualization of results of the one-user system with HP|
+| `input.csv` | Hourly input time series data: PV generation, demand, DHW, weather |
+| `input_tobb_haztartas.csv` | Hourly input time series data for the two-user system: PV generation, demand |
 
-## Röviden a modellekről
+## System Configurations Modeled
 
-- **1 háztartás (PV + ELH)** – alapmodell, kontrollált bojler, hőtárolóval
-- **2 háztartás (PV + ELH)** – közös BESS, de külön bojlerek; energia megosztás vizsgálata
-- **1 háztartás (PV + ELH + HP)** – hőszivattyús modell, épülethőmérsékletet is optimalizálva (5R2C modell)
+- **1 household (PV + ELH)** – basic scenario with controllable electric boiler and thermal storage
+- **2 households (PV + ELH)** – community model with shared battery and energy exchange
+- **1 household (PV + ELH + HP)** – extended scenario with heat pump and building dynamics (5R2C model)
 
-A megoldó Gurobi Optimizer, lineáris vagy vegyes-egész MILP modellezéssel.
+The optimization is solved using **Gurobi Optimizer** via mixed-integer linear programming (MILP).
 
----
+## Notes
 
-Ha publikusan osztod meg a repót, érdemes még megadni:
-- licence típusa (`LICENSE`)
-- DOI vagy link az egyetemi dolgozathoz (ha lesz ilyen)
+- All time series simulations use hourly resolution for the year 2023
+- Thermal dynamics are modeled to support state-aware heating decisions
+- The project supports environmental objective functions, focusing on maximizing local renewable utilization
 
-Szólj, ha ezt Markdown-fájlként is kéred `.md` formátumban!
